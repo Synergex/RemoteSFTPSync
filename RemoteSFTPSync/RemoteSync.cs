@@ -76,7 +76,7 @@ namespace RemoteSFTPSync
             return Task.Factory.FromAsync(begin, sftp.EndUploadFile, file, destination, null);
         }
 
-        public static Task<IEnumerable<SftpFile>> ListDirectoryAsync(SftpClient sftp, string path)
+        public static Task<IEnumerable<ISftpFile>> ListDirectoryAsync(SftpClient sftp, string path)
         {
             Func<string, AsyncCallback, object, IAsyncResult> begin = (bpath, callback, state) => sftp.BeginListDirectory(bpath, callback, state, null);
             return Task.Factory.FromAsync(begin, sftp.EndListDirectory, path, null);
