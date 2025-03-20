@@ -126,7 +126,7 @@ namespace RemoteSFTPSync
         public async Task CreateDirectories(string localPath, string remotePath)
         {
             var localDirectories = Directory.GetDirectories(localPath).Where(
-                path => !path.Contains(".git") && !path.EndsWith("obj") && !path.EndsWith("bin") && !path.EndsWith(".vs"));
+                path => !path.Contains(".git") && !path.EndsWith("obj") && !path.EndsWith("bin") && !path.Contains("."));
             var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
             {
                 if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
@@ -149,7 +149,7 @@ namespace RemoteSFTPSync
         {
             await DoneMakingFolders;
             var localDirectories = Directory.GetDirectories(localPath).Where(
-                path => !path.Contains(".git") && !path.EndsWith("obj") && !path.EndsWith("bin") && !path.EndsWith(".vs"));
+                path => !path.Contains(".git") && !path.EndsWith("obj") && !path.EndsWith("bin") && !path.Contains("."));
             var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
             {
                 if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
