@@ -1,4 +1,5 @@
-﻿using Renci.SshNet;
+﻿
+using Renci.SshNet;
 using Renci.SshNet.Sftp;
 using System;
 using System.Collections.Generic;
@@ -6,11 +7,72 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace RemoteSFTPSync
 {
+    class SyncDirector
+    {
+        FileSystemWatcher _fsw;
+        List<(Regex, Action<FileSystemEventArgs>)> callbacks = new List<(Regex, Action<FileSystemEventArgs>)>();
+
+        public SyncDirector(string rootFolder)
+        {
+            _fsw = new FileSystemWatcher(rootFolder, "*.*")
+            {
+                IncludeSubdirectories = true,
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName
+            };
+
+            _fsw.Changed += Fsw_Changed;
+            _fsw.Created += Fsw_Created;
+            _fsw.Renamed += Fsw_Renamed;
+
+            _fsw.EnableRaisingEvents = true;
+        }
+
+        private void Fsw_Renamed(object sender, RenamedEventArgs e)
+        {
+            foreach (var (regex, callback) in callbacks)
+            {
+                if (regex.IsMatch(e.FullPath))
+                {
+                    callback(e);
+                }
+            }
+        }
+
+        private void Fsw_Created(object sender, FileSystemEventArgs e)
+        {
+            foreach (var (regex, callback) in callbacks)
+            {
+                if (regex.IsMatch(e.FullPath))
+                {
+                    callback(e);
+                }
+            }
+        }
+
+        public void AddCallback(string match, Action<FileSystemEventArgs> handler)
+        {
+            string regexPattern = "^" + Regex.Escape(match).Replace("\\*", ".*") + "$";
+            callbacks.Add((new Regex(regexPattern), handler));
+        }
+
+        private void Fsw_Changed(object sender, FileSystemEventArgs e)
+        {
+            foreach (var (regex, callback) in callbacks)
+            {
+                if (regex.IsMatch(e.FullPath))
+                {
+                    callback(e);
+                }
+            }
+        }
+    }
+
     class RemoteSync : IDisposable
     {
         string _host;
@@ -20,10 +82,12 @@ namespace RemoteSFTPSync
         string _localRootDirectory;
         string _remoteRootDirectory;
         SftpClient _sftp;
-        FileSystemWatcher _fsw;
+        SyncDirector _director;
         HashSet<string> _activeDirSync = new HashSet<string>();
 
-        public RemoteSync(string host, string username, string password, string localRootDirectory, string remoteRootDirectory, string searchPattern)
+        public Task DoneMakingFolders { get; }
+
+        public RemoteSync(string host, string username, string password, string localRootDirectory, string remoteRootDirectory, string searchPattern, bool createFolders, SyncDirector director)
         {
             _host = host;
             _username = username;
@@ -31,33 +95,45 @@ namespace RemoteSFTPSync
             _searchPattern = searchPattern;
             _localRootDirectory = localRootDirectory;
             _remoteRootDirectory = remoteRootDirectory;
-
+            _director = director;
             _sftp = new SftpClient(host, username, password);
             _sftp.Connect();
+            DoneMakingFolders = createFolders ? CreateDirectories(_localRootDirectory, _remoteRootDirectory) : Task.CompletedTask;
             var tsk = InitialSync(_localRootDirectory, _remoteRootDirectory);
-
+            
             tsk.ContinueWith((tmp) =>
             {
-                _fsw = new FileSystemWatcher(localRootDirectory, searchPattern);
-                _fsw.IncludeSubdirectories = true;
-                _fsw.NotifyFilter = NotifyFilters.LastWrite;
-                _fsw.Changed += Fsw_Changed;
-                _fsw.EnableRaisingEvents = true;
+                _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
             });
         }
 
         
         public static Task<IEnumerable<FileInfo>> SyncDirectoryAsync(SftpClient sftp, string sourcePath, string destinationPath, string searchPattern)
         {
-            return Task<IEnumerable<FileInfo>>.Factory.FromAsync(sftp.BeginSynchronizeDirectories,
-                                               sftp.EndSynchronizeDirectories, sourcePath,
-                                               destinationPath, searchPattern, null);
+            if (new DirectoryInfo(sourcePath).EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly).Any())
+            {
+                Console.WriteLine($"Sync directory started {sourcePath} -> {destinationPath} with search pattern {searchPattern}");
+                return Task<IEnumerable<FileInfo>>.Factory.FromAsync(sftp.BeginSynchronizeDirectories,
+                                                   sftp.EndSynchronizeDirectories, sourcePath,
+                                                   destinationPath, searchPattern, null);
+            }
+            else
+            {
+                return Task.FromResult(Enumerable.Empty<FileInfo>());
+            }
         }
 
-        public async Task InitialSync(string localPath, string remotePath)
+        public async Task CreateDirectories(string localPath, string remotePath)
         {
-            var localDirectories = Directory.GetDirectories(localPath);
-            var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item => item.Name.Remove(item.Name.IndexOf(".DIR")));
+            var localDirectories = Directory.GetDirectories(localPath).Where(
+                path => !path.Contains(".git") && path.EndsWith("obj") && path.EndsWith("bin") && path.EndsWith(".vs"));
+            var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
+            {
+                if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
+                    return item.Name.Remove(item.Name.IndexOf(".DIR", StringComparison.OrdinalIgnoreCase));
+                else
+                    return item.Name;
+            });
             foreach (var item in localDirectories)
             {
                 var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
@@ -65,16 +141,38 @@ namespace RemoteSFTPSync
                 {
                     _sftp.CreateDirectory(remotePath + "/" + directoryName);
                 }
+                await CreateDirectories(localPath + "\\" + directoryName, remotePath + "/" + directoryName);
+            }
+        }
+
+        public async Task InitialSync(string localPath, string remotePath)
+        {
+            await DoneMakingFolders;
+            var localDirectories = Directory.GetDirectories(localPath).Where(
+                path => !path.Contains(".git") && path.EndsWith("obj") && path.EndsWith("bin") && path.EndsWith(".vs"));
+            var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
+            {
+                if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
+                    return item.Name.Remove(item.Name.IndexOf(".DIR", StringComparison.OrdinalIgnoreCase));
+                else
+                    return item.Name;
+                });
+            foreach (var item in localDirectories)
+            {
+                var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
                 await InitialSync(localPath + "\\" + directoryName, remotePath + "/" + directoryName);
             }
+            
             await SyncDirectoryAsync(_sftp, localPath, remotePath, _searchPattern);
         }
+
 
         public static Task UploadFileAsync(SftpClient sftp, Stream file, string destination)
         {
             Func<Stream, string, AsyncCallback, object, IAsyncResult> begin = (stream, path, callback, state) => sftp.BeginUploadFile(stream, path, true, callback, state, null);
             return Task.Factory.FromAsync(begin, sftp.EndUploadFile, file, destination, null);
         }
+
 
         public static Task<IEnumerable<ISftpFile>> ListDirectoryAsync(SftpClient sftp, string path)
         {
@@ -108,11 +206,11 @@ namespace RemoteSFTPSync
             }
         }
 
-       
 
         private async void Fsw_Changed(object sender, FileSystemEventArgs arg)
         {
-            if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created)
+            if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
+                || arg.ChangeType == WatcherChangeTypes.Renamed)
             {
                 var changedPath = Path.GetDirectoryName(arg.FullPath);
                 lock (_activeDirSync)
@@ -151,11 +249,7 @@ namespace RemoteSFTPSync
             }
             _sftp = null;
 
-            if (_fsw != null)
-            {
-                _fsw.Dispose();
-            }
-            _fsw = null;
+           
         }
     }
 }

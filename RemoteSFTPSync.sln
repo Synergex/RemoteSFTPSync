@@ -5,7 +5,7 @@ VisualStudioVersion = 17.11.35327.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoteSFTPSyncCore", "RemoteSFTPSync\RemoteSFTPSyncCore.csproj", "{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Renci.SshNet", "SSH.NET\src\Renci.SshNet\Renci.SshNet.csproj", "{A093F4F9-7295-4866-A534-2E240F87C569}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Renci.SshNet", "SSH.NET\src\Renci.SshNet\Renci.SshNet.csproj", "{2F5F8C90-0BD1-424F-997C-7BC6280919D1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,10 +17,10 @@ Global
 		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A093F4F9-7295-4866-A534-2E240F87C569}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A093F4F9-7295-4866-A534-2E240F87C569}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A093F4F9-7295-4866-A534-2E240F87C569}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A093F4F9-7295-4866-A534-2E240F87C569}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

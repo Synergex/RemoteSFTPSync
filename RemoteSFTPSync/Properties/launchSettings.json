@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "RemoteSFTPSyncCore": {
+      "commandName": "Project",
+      "commandLineArgs": "VMSIT reliance1 reliance1 C:\\WINDEV\\WIN /DISK$VMS84/RELIANCE1/WIN/ \"*.DBL;*.C;*.H;*.COM;*.BAS;*.NME;*.MAR;*.HDF;*.FDL;*.OPT;*.EXP;*.HDR;*.MMS;*.FORM;*.SCR\""
+    }
+  }
+}
