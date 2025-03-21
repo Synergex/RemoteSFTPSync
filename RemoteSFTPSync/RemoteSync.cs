@@ -140,22 +140,30 @@ namespace RemoteSFTPSync
 
         public async Task CreateDirectories(string localPath, string remotePath)
         {
-            var localDirectories = FilteredDirectories(localPath);
-            var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
+            try
             {
-                if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
-                    return item.Name.Remove(item.Name.IndexOf(".DIR", StringComparison.OrdinalIgnoreCase));
-                else
-                    return item.Name;
-            });
-            foreach (var item in localDirectories)
-            {
-                var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
-                if (!remoteDirectories.ContainsKey(directoryName))
+                var localDirectories = FilteredDirectories(localPath);
+                var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
                 {
-                    _sftp.CreateDirectory(remotePath + "/" + directoryName);
+                    if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
+                        return item.Name.Remove(item.Name.IndexOf(".DIR", StringComparison.OrdinalIgnoreCase));
+                    else
+                        return item.Name;
+                });
+                foreach (var item in localDirectories)
+                {
+                    var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
+                    if (!remoteDirectories.ContainsKey(directoryName))
+                    {
+                        _sftp.CreateDirectory(remotePath + "/" + directoryName);
+                    }
+                    await CreateDirectories(localPath + "\\" + directoryName, remotePath + "/" + directoryName);
                 }
-                await CreateDirectories(localPath + "\\" + directoryName, remotePath + "/" + directoryName);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Failed while creating directories, did you have the initial root folder on the remote system?");
+                Environment.Exit(-1);
             }
         }
 
