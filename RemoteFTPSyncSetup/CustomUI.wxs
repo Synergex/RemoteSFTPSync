@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ <copyright file="CustomUI.wxs" company="Synergex International Corporation">
+   Copyright (c) 2025, Synergex International Corporation.
+ </copyright>
+-->
+
+<!--
+First-time install dialog sequence:
+- WixUI_WelcomeDlg
+- WixUI_LicenseAgreementDlg
+- ConfigDlg
+- WixUI_CustomizeDlg
+- WixUI_VerifyReadyDlg
+- WixUI_DiskCostDlg
+
+Maintenance dialog sequence:
+- WixUI_MaintenanceWelcomeDlg
+- WixUI_MaintenanceTypeDlg
+- WixUI_CustomizeDlg
+- WixUI_VerifyReadyDlg
+
+Patch dialog sequence:
+- WixUI_WelcomeDlg
+- WixUI_VerifyReadyDlg
+-->
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<Fragment>
+		<UI Id="CustomUI">
+			<TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+			<TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+			<TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+
+			<Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+			<Property Id="WixUI_Mode" Value="FeatureTree" />
+
+			<DialogRef Id="ErrorDlg" />
+			<DialogRef Id="FatalError" />
+			<DialogRef Id="FilesInUse" />
+			<DialogRef Id="MsiRMFilesInUse" />
+			<DialogRef Id="PrepareDlg" />
+			<DialogRef Id="ProgressDlg" />
+			<DialogRef Id="ResumeDlg" />
+			<DialogRef Id="UserExit" />
+
+			<Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
+
+			<Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg">NOT Installed</Publish>
+			<Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">Installed AND PATCH</Publish>
+
+			<Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+			<Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ConfigDlg">LicenseAccepted = "1"</Publish>
+
+			<Dialog Id="ConfigDlg" Width="370" Height="270" Title="Developer Registration">
+
+				<Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="Next">
+					<Publish Event="NewDialog" Value="CustomizeDlg">1</Publish>
+				</Control>
+				<Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="Back">
+					<Publish Event="NewDialog" Value="LicenseAgreementDlg">1</Publish>
+				</Control>
+				<Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
+					<Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+				</Control>
+
+				<Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}File Sync Configuration" />
+				<Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter information about the source and destination systems." />
+				<Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+				<Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+				<Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+				<Control Id="LocalRootPrompt" Type="Text" X="20" Y="47" Width="290" Height="13" NoPrefix="yes" Text="Local root directory" />
+				<Control Id="LocalRoot" Type="Edit" X="20" Y="57" Width="290" Height="18" Property="LOCAL_ROOT" />
+
+				<Control Id="SearchPatternPrompt" Type="Text" X="20" Y="75" Width="290" Height="13" NoPrefix="yes" Text="Local file search pattern" />
+				<Control Id="SearchPattern" Type="Edit" X="20" Y="85" Width="290" Height="18" Property="LOCAL_SEARCH_PATTERN" />
+
+				<Control Id="RemoteHostPrompt" Type="Text" X="20" Y="103" Width="290" Height="13" NoPrefix="yes" Text="Remote host" />
+				<Control Id="RemoteHost" Type="Edit" X="20" Y="113" Width="290" Height="18" Property="REMOTE_HOST" />
+
+				<Control Id="RemoteUserPrompt" Type="Text" X="20" Y="132" Width="290" Height="13" NoPrefix="yes" Text="Remote username" />
+				<Control Id="RemoteUser" Type="Edit" X="20" Y="142" Width="290" Height="18" Property="REMOTE_USER" />
+
+				<Control Id="RemotePasswordPrompt" Type="Text" X="20" Y="160" Width="290" Height="13" NoPrefix="yes" Text="Remote username" />
+				<Control Id="RemotePassword" Type="Edit" X="20" Y="170" Width="290" Height="18" Property="REMOTE_PASSWORD" />
+
+				<Control Id="RemotePathPrompt" Type="Text" X="20" Y="188" Width="290" Height="13" NoPrefix="yes" Text="Remote path" />
+				<Control Id="RemotePath" Type="Edit" X="20" Y="198" Width="290" Height="18" Property="REMOTE_PATH" />
+
+			</Dialog>
+
+
+			<Publish Dialog="CustomizeDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="1">Installed</Publish>
+			<Publish Dialog="CustomizeDlg" Control="Back" Event="NewDialog" Value="ConfigDlg" Order="2">NOT Installed</Publish>
+			<Publish Dialog="CustomizeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+
+			<Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CustomizeDlg" Order="1">NOT Installed OR WixUI_InstallMode = "Change"</Publish>
+			<Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2">Installed AND NOT PATCH</Publish>
+			<Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3">Installed AND PATCH</Publish>
+
+			<Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+
+			<Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="CustomizeDlg">1</Publish>
+			<Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+			<Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+			<Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
+		</UI>
+
+		<UIRef Id="WixUI_Common" />
+	</Fragment>
+</Wix>

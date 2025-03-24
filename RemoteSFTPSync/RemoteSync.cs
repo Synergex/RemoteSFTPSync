@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace RemoteSFTPSync
 {
-    class SyncDirector
+    public class SyncDirector
     {
         FileSystemWatcher _fsw;
         List<(Regex, Action<FileSystemEventArgs>)> callbacks = new List<(Regex, Action<FileSystemEventArgs>)>();
@@ -73,7 +73,7 @@ namespace RemoteSFTPSync
         }
     }
 
-    class RemoteSync : IDisposable
+    public class RemoteSync : IDisposable
     {
         string _host;
         string _username;
@@ -160,7 +160,7 @@ namespace RemoteSFTPSync
                     await CreateDirectories(localPath + "\\" + directoryName, remotePath + "/" + directoryName);
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Console.WriteLine("Failed while creating directories, did you have the initial root folder on the remote system?");
                 Environment.Exit(-1);
