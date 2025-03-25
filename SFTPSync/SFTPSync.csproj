@@ -1,10 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Title>SFTP Sync</Title>
+    <ApplicationIcon>SFTPSync.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,15 +18,12 @@
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="SFTPSync.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Logging.EventLog" Version="9.0.3" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\RemoteSFTPSync\RemoteSFTPSyncCore.csproj" />
     <ProjectReference Include="..\SSH.NET\src\Renci.SshNet\Renci.SshNet.csproj" />
   </ItemGroup>
 
