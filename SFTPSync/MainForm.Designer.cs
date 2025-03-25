@@ -32,6 +32,8 @@
             checkStartAtLogin = new CheckBox();
             checkStartInTray = new CheckBox();
             groupBoxSettings = new GroupBox();
+            buttonStartStopSync = new Button();
+            checkBoxShowPassword = new CheckBox();
             checkBoxAutoStartSync = new CheckBox();
             textBoxRemotePath = new TextBox();
             labelRemotePath = new Label();
@@ -46,27 +48,25 @@
             buttonLocalPath = new Button();
             textBoxLocalPath = new TextBox();
             labelLocalPath = new Label();
-            groupBoxActivity = new GroupBox();
             listBoxMessages = new ListBox();
             groupBoxSettings.SuspendLayout();
-            groupBoxActivity.SuspendLayout();
             SuspendLayout();
             // 
             // checkStartAtLogin
             // 
             checkStartAtLogin.AutoSize = true;
-            checkStartAtLogin.Location = new Point(982, 29);
+            checkStartAtLogin.Location = new Point(109, 130);
             checkStartAtLogin.Name = "checkStartAtLogin";
             checkStartAtLogin.Size = new Size(117, 24);
             checkStartAtLogin.TabIndex = 7;
-            checkStartAtLogin.Text = "&Start at login";
+            checkStartAtLogin.Text = "Start at &login";
             checkStartAtLogin.UseVisualStyleBackColor = true;
             checkStartAtLogin.CheckedChanged += checkStartAtLogin_CheckedChanged;
             // 
             // checkStartInTray
             // 
             checkStartInTray.AutoSize = true;
-            checkStartInTray.Location = new Point(982, 62);
+            checkStartInTray.Location = new Point(232, 130);
             checkStartInTray.Name = "checkStartInTray";
             checkStartInTray.Size = new Size(156, 24);
             checkStartInTray.TabIndex = 8;
@@ -76,6 +76,8 @@
             // 
             // groupBoxSettings
             // 
+            groupBoxSettings.Controls.Add(buttonStartStopSync);
+            groupBoxSettings.Controls.Add(checkBoxShowPassword);
             groupBoxSettings.Controls.Add(checkBoxAutoStartSync);
             groupBoxSettings.Controls.Add(textBoxRemotePath);
             groupBoxSettings.Controls.Add(labelRemotePath);
@@ -92,17 +94,39 @@
             groupBoxSettings.Controls.Add(labelLocalPath);
             groupBoxSettings.Controls.Add(checkStartAtLogin);
             groupBoxSettings.Controls.Add(checkStartInTray);
-            groupBoxSettings.Location = new Point(12, 12);
+            groupBoxSettings.Dock = DockStyle.Top;
+            groupBoxSettings.Location = new Point(0, 0);
             groupBoxSettings.Name = "groupBoxSettings";
-            groupBoxSettings.Size = new Size(1158, 137);
+            groupBoxSettings.Size = new Size(1182, 165);
             groupBoxSettings.TabIndex = 4;
             groupBoxSettings.TabStop = false;
             groupBoxSettings.Text = "Settings";
             // 
+            // buttonStartStopSync
+            // 
+            buttonStartStopSync.Location = new Point(1072, 128);
+            buttonStartStopSync.Name = "buttonStartStopSync";
+            buttonStartStopSync.Size = new Size(94, 29);
+            buttonStartStopSync.TabIndex = 18;
+            buttonStartStopSync.Text = "&Start Sync";
+            buttonStartStopSync.UseVisualStyleBackColor = true;
+            buttonStartStopSync.Click += buttonStartStopSync_Click;
+            // 
+            // checkBoxShowPassword
+            // 
+            checkBoxShowPassword.AutoSize = true;
+            checkBoxShowPassword.Location = new Point(801, 130);
+            checkBoxShowPassword.Name = "checkBoxShowPassword";
+            checkBoxShowPassword.Size = new Size(134, 24);
+            checkBoxShowPassword.TabIndex = 17;
+            checkBoxShowPassword.Text = "Show &password";
+            checkBoxShowPassword.UseVisualStyleBackColor = true;
+            checkBoxShowPassword.CheckedChanged += checkBoxShowPassword_CheckedChanged;
+            // 
             // checkBoxAutoStartSync
             // 
             checkBoxAutoStartSync.AutoSize = true;
-            checkBoxAutoStartSync.Location = new Point(982, 95);
+            checkBoxAutoStartSync.Location = new Point(394, 130);
             checkBoxAutoStartSync.Name = "checkBoxAutoStartSync";
             checkBoxAutoStartSync.Size = new Size(128, 24);
             checkBoxAutoStartSync.TabIndex = 16;
@@ -112,16 +136,16 @@
             // 
             // textBoxRemotePath
             // 
-            textBoxRemotePath.Location = new Point(119, 93);
+            textBoxRemotePath.Location = new Point(112, 93);
             textBoxRemotePath.Name = "textBoxRemotePath";
-            textBoxRemotePath.Size = new Size(487, 27);
+            textBoxRemotePath.Size = new Size(514, 27);
             textBoxRemotePath.TabIndex = 3;
             textBoxRemotePath.TextChanged += textBoxRemotePath_TextChanged;
             // 
             // labelRemotePath
             // 
             labelRemotePath.AutoSize = true;
-            labelRemotePath.Location = new Point(18, 96);
+            labelRemotePath.Location = new Point(11, 96);
             labelRemotePath.Name = "labelRemotePath";
             labelRemotePath.Size = new Size(95, 20);
             labelRemotePath.TabIndex = 15;
@@ -129,17 +153,17 @@
             // 
             // textBoxRemotePassword
             // 
-            textBoxRemotePassword.Location = new Point(796, 93);
+            textBoxRemotePassword.Location = new Point(801, 93);
             textBoxRemotePassword.Name = "textBoxRemotePassword";
-            textBoxRemotePassword.PasswordChar = '*';
-            textBoxRemotePassword.Size = new Size(125, 27);
+            textBoxRemotePassword.Size = new Size(365, 27);
             textBoxRemotePassword.TabIndex = 6;
+            textBoxRemotePassword.UseSystemPasswordChar = true;
             textBoxRemotePassword.TextChanged += textBoxRemotePassword_TextChanged;
             // 
             // labelRemotePassword
             // 
             labelRemotePassword.AutoSize = true;
-            labelRemotePassword.Location = new Point(661, 96);
+            labelRemotePassword.Location = new Point(670, 96);
             labelRemotePassword.Name = "labelRemotePassword";
             labelRemotePassword.Size = new Size(128, 20);
             labelRemotePassword.TabIndex = 13;
@@ -147,16 +171,16 @@
             // 
             // textBoxRemoteUser
             // 
-            textBoxRemoteUser.Location = new Point(796, 60);
+            textBoxRemoteUser.Location = new Point(801, 60);
             textBoxRemoteUser.Name = "textBoxRemoteUser";
-            textBoxRemoteUser.Size = new Size(125, 27);
+            textBoxRemoteUser.Size = new Size(365, 27);
             textBoxRemoteUser.TabIndex = 5;
             textBoxRemoteUser.TextChanged += textBoxRemoteUser_TextChanged;
             // 
             // labelRemoteUser
             // 
             labelRemoteUser.AutoSize = true;
-            labelRemoteUser.Location = new Point(661, 63);
+            labelRemoteUser.Location = new Point(670, 63);
             labelRemoteUser.Name = "labelRemoteUser";
             labelRemoteUser.Size = new Size(92, 20);
             labelRemoteUser.TabIndex = 11;
@@ -164,16 +188,16 @@
             // 
             // textBoxRemoteHost
             // 
-            textBoxRemoteHost.Location = new Point(796, 27);
+            textBoxRemoteHost.Location = new Point(801, 27);
             textBoxRemoteHost.Name = "textBoxRemoteHost";
-            textBoxRemoteHost.Size = new Size(125, 27);
+            textBoxRemoteHost.Size = new Size(365, 27);
             textBoxRemoteHost.TabIndex = 4;
             textBoxRemoteHost.TextChanged += textBoxRemoteHost_TextChanged;
             // 
             // labelRemoteHost
             // 
             labelRemoteHost.AutoSize = true;
-            labelRemoteHost.Location = new Point(661, 31);
+            labelRemoteHost.Location = new Point(670, 31);
             labelRemoteHost.Name = "labelRemoteHost";
             labelRemoteHost.Size = new Size(93, 20);
             labelRemoteHost.TabIndex = 9;
@@ -181,16 +205,16 @@
             // 
             // textBoxSearchSpec
             // 
-            textBoxSearchSpec.Location = new Point(119, 60);
+            textBoxSearchSpec.Location = new Point(109, 60);
             textBoxSearchSpec.Name = "textBoxSearchSpec";
-            textBoxSearchSpec.Size = new Size(487, 27);
+            textBoxSearchSpec.Size = new Size(517, 27);
             textBoxSearchSpec.TabIndex = 2;
             textBoxSearchSpec.TextChanged += textBoxSearchSpec_TextChanged;
             // 
             // labelSearchSpec
             // 
             labelSearchSpec.AutoSize = true;
-            labelSearchSpec.Location = new Point(18, 63);
+            labelSearchSpec.Location = new Point(11, 63);
             labelSearchSpec.Name = "labelSearchSpec";
             labelSearchSpec.Size = new Size(87, 20);
             labelSearchSpec.TabIndex = 7;
@@ -198,7 +222,7 @@
             // 
             // buttonLocalPath
             // 
-            buttonLocalPath.Location = new Point(612, 25);
+            buttonLocalPath.Location = new Point(627, 26);
             buttonLocalPath.Name = "buttonLocalPath";
             buttonLocalPath.Size = new Size(34, 29);
             buttonLocalPath.TabIndex = 1;
@@ -208,40 +232,32 @@
             // 
             // textBoxLocalPath
             // 
-            textBoxLocalPath.Location = new Point(119, 27);
+            textBoxLocalPath.Location = new Point(109, 27);
             textBoxLocalPath.Name = "textBoxLocalPath";
-            textBoxLocalPath.Size = new Size(487, 27);
+            textBoxLocalPath.Size = new Size(517, 27);
             textBoxLocalPath.TabIndex = 0;
             textBoxLocalPath.TextChanged += textBoxLocalPath_TextChanged;
             // 
             // labelLocalPath
             // 
             labelLocalPath.AutoSize = true;
-            labelLocalPath.Location = new Point(18, 31);
+            labelLocalPath.Location = new Point(11, 31);
             labelLocalPath.Name = "labelLocalPath";
             labelLocalPath.Size = new Size(78, 20);
             labelLocalPath.TabIndex = 4;
             labelLocalPath.Text = "Local path";
             // 
-            // groupBoxActivity
-            // 
-            groupBoxActivity.Controls.Add(listBoxMessages);
-            groupBoxActivity.Location = new Point(12, 155);
-            groupBoxActivity.Name = "groupBoxActivity";
-            groupBoxActivity.Size = new Size(1158, 586);
-            groupBoxActivity.TabIndex = 5;
-            groupBoxActivity.TabStop = false;
-            groupBoxActivity.Text = "Activity";
-            // 
             // listBoxMessages
             // 
+            listBoxMessages.Dock = DockStyle.Fill;
             listBoxMessages.FormattingEnabled = true;
             listBoxMessages.HorizontalScrollbar = true;
-            listBoxMessages.Location = new Point(18, 26);
+            listBoxMessages.Location = new Point(0, 165);
+            listBoxMessages.Margin = new Padding(10);
             listBoxMessages.Name = "listBoxMessages";
             listBoxMessages.ScrollAlwaysVisible = true;
-            listBoxMessages.SelectionMode = SelectionMode.MultiSimple;
-            listBoxMessages.Size = new Size(1120, 544);
+            listBoxMessages.SelectionMode = SelectionMode.None;
+            listBoxMessages.Size = new Size(1182, 588);
             listBoxMessages.TabIndex = 0;
             // 
             // MainForm
@@ -249,19 +265,16 @@
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1182, 753);
-            Controls.Add(groupBoxActivity);
+            Controls.Add(listBoxMessages);
             Controls.Add(groupBoxSettings);
-            FormBorderStyle = FormBorderStyle.FixedDialog;
             Icon = (Icon)resources.GetObject("$this.Icon");
-            MaximizeBox = false;
-            MinimizeBox = false;
+            MinimumSize = new Size(1200, 800);
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "SFTP Sync";
             FormClosing += MainForm_FormClosing;
             groupBoxSettings.ResumeLayout(false);
             groupBoxSettings.PerformLayout();
-            groupBoxActivity.ResumeLayout(false);
             ResumeLayout(false);
         }
 
@@ -283,8 +296,9 @@
         private Label labelSearchSpec;
         private Button buttonLocalPath;
         private TextBox textBoxRemotePath;
-        private GroupBox groupBoxActivity;
         private ListBox listBoxMessages;
         private CheckBox checkBoxAutoStartSync;
+        private CheckBox checkBoxShowPassword;
+        private Button buttonStartStopSync;
     }
 }

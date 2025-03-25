@@ -1,4 +1,5 @@
 
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace SFTPSync
@@ -8,6 +9,7 @@ namespace SFTPSync
         private NotifyIcon notifyIcon;
         private ContextMenuStrip contextMenu;
         private bool initialUiLoad = false;
+        private bool syncRunning = false;
 
         public MainForm()
         {
@@ -39,10 +41,53 @@ namespace SFTPSync
                 ShowInTaskbar = true;
             });
 
+            // Conditionally add the Help item
+
+            // Path when installed
+            string helpFilePath = Path.Combine(Application.StartupPath, "SFTPSync.chm");
+
+            if (!File.Exists(helpFilePath))
+            {
+                // Path when in development environment
+                helpFilePath = Path.Combine(Application.StartupPath, "docs", "SFTPSync.chm");
+            }
+
+            if (File.Exists(helpFilePath))
+            {
+                contextMenu.Items.Add("Help", null, (s, e) =>
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "hh.exe",
+                            Arguments = $"\"{helpFilePath}\"",
+                            UseShellExecute = false
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Unable to open help file. {ex.Message}",
+                            Application.ProductName,
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                    }
+                });
+            }
+
             contextMenu.Items.Add(new ToolStripSeparator());
 
             contextMenu.Items.Add("Exit", null, (s, e) =>
             {
+                //The user asked us to close the application
+
+                // Stop the sync process if it is running
+                if (syncRunning)
+                {
+                    stopSync();
+                }
+
+                //And close the application
                 notifyIcon.Visible = false;
                 Application.Exit();
             });
@@ -66,25 +111,21 @@ namespace SFTPSync
             textBoxRemoteHost.Text = SFTPSync.Settings.RemoteHost;
             textBoxRemotePath.Text = SFTPSync.Settings.RemotePath;
             textBoxRemoteUser.Text = SFTPSync.Settings.RemoteUsername;
-            textBoxRemotePassword.Text = SFTPSync.Settings.RemotePassword;
+            textBoxRemotePassword.Text = DPAPIEncryption.Decrypt(SFTPSync.Settings.RemotePassword);
             checkStartAtLogin.Checked = SFTPSync.Settings.StartAtLogin;
             checkStartInTray.Checked = SFTPSync.Settings.StartInTray;
             checkBoxAutoStartSync.Checked = SFTPSync.Settings.AutoStartSync;
             initialUiLoad = false;
 
-            enableDisableAutoStart();
-
             //Set the initial window visibility
             ShowInTaskbar = !checkStartInTray.Checked;
             WindowState = checkStartInTray.Checked ? FormWindowState.Minimized : FormWindowState.Normal;
-        }
 
-        public void AddMessage(string message)
-        {
-            if (listBoxMessages.Items.Count > 1000)
-                listBoxMessages.Items.RemoveAt(0);
-            listBoxMessages.Items.Add(message);
-            listBoxMessages.SelectedIndex = listBoxMessages.Items.Count - 1;
+            // Can we and should we start the sync process now?
+            if (enableDisableStartSync() && checkBoxAutoStartSync.Checked)
+            {
+                startSync();
+            }
         }
 
         private void buttonLocalPath_Click(object sender, EventArgs e)
@@ -117,7 +158,7 @@ namespace SFTPSync
                     SFTPSync.Settings.LocalPath = textBoxLocalPath.Text;
                 }
             }
-            enableDisableAutoStart();
+            enableDisableStartSync();
         }
 
         private void textBoxSearchSpec_TextChanged(object sender, EventArgs e)
@@ -132,7 +173,7 @@ namespace SFTPSync
                     SFTPSync.Settings.LocalSearchPattern = textBoxSearchSpec.Text;
                 }
             }
-            enableDisableAutoStart();
+            enableDisableStartSync();
         }
 
         private bool searchSpecOK()
@@ -152,7 +193,7 @@ namespace SFTPSync
             {
                 SFTPSync.Settings.RemotePath = textBoxRemotePath.Text;
             }
-            enableDisableAutoStart();
+            enableDisableStartSync();
         }
 
         private void textBoxRemoteHost_TextChanged(object sender, EventArgs e)
@@ -164,7 +205,7 @@ namespace SFTPSync
             {
                 SFTPSync.Settings.RemoteHost = textBoxRemoteHost.Text;
             }
-            enableDisableAutoStart();
+            enableDisableStartSync();
         }
 
         private void textBoxRemoteUser_TextChanged(object sender, EventArgs e)
@@ -176,7 +217,7 @@ namespace SFTPSync
             {
                 SFTPSync.Settings.RemoteUsername = textBoxRemoteUser.Text;
             }
-            enableDisableAutoStart();
+            enableDisableStartSync();
         }
 
         private void textBoxRemotePassword_TextChanged(object sender, EventArgs e)
@@ -186,9 +227,9 @@ namespace SFTPSync
 
             if (SFTPSync.Settings != null)
             {
-                SFTPSync.Settings.RemotePassword = textBoxRemotePassword.Text;
+                SFTPSync.Settings.RemotePassword = DPAPIEncryption.Encrypt(textBoxRemotePassword.Text);
             }
-            enableDisableAutoStart();
+            enableDisableStartSync();
         }
 
         private void checkStartAtLogin_CheckedChanged(object sender, EventArgs e)
@@ -224,7 +265,33 @@ namespace SFTPSync
             }
         }
 
-        private void enableDisableAutoStart()
+        private void AppendLog(string message)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => AddMessage(message)));
+            }
+            else
+            {
+                AddMessage(message);
+            }
+        }
+
+        private void AddMessage(string message)
+        {
+            listBoxMessages.Items.Add(message);
+
+            // Optional: auto-scroll to bottom
+            listBoxMessages.TopIndex = listBoxMessages.Items.Count - 1;
+
+            // Optional: trim excess from UI if _log did a dequeue
+            if (listBoxMessages.Items.Count > 1000)
+            {
+                listBoxMessages.Items.RemoveAt(0);
+            }
+        }
+
+        private bool enableDisableStartSync()
         {
             bool allOk = true;
 
@@ -250,10 +317,12 @@ namespace SFTPSync
                 allOk = false;
 
             //Remote password validation (just has to be non-null)
-            if (allOk && String.IsNullOrWhiteSpace(textBoxRemotePassword.Text))
+            if (allOk && String.IsNullOrWhiteSpace(DPAPIEncryption.Decrypt(textBoxRemotePassword.Text)))
                 allOk = false;
 
-            checkBoxAutoStartSync.Enabled = allOk;
+            buttonStartStopSync.Enabled = allOk;
+
+            return allOk;
         }
 
         public static bool isValidSearchSpec(string input)
@@ -273,6 +342,44 @@ namespace SFTPSync
             // Check each pattern
             return patterns.All(p => wildcardRegex.IsMatch(p));
         }
+        private void buttonStartStopSync_Click(object sender, EventArgs e)
+        {
+            if (syncRunning)
+            {
+                stopSync();
+            }
+            else
+            {
+                startSync();
+            }
+        }
+
+        private void startSync()
+        {
+            syncRunning = true;
+            configureUI();
+            SFTPSync.StartSync(AppendLog);
+        }
+
+        private void stopSync()
+        {
+            syncRunning = false;
+            configureUI();
+            SFTPSync.StopSync(AppendLog);
+        }
+
+        private void configureUI()
+        {
+            textBoxLocalPath.Enabled = !syncRunning;
+            buttonLocalPath.Enabled = !syncRunning;
+            textBoxSearchSpec.Enabled = !syncRunning;
+            textBoxRemotePath.Enabled = !syncRunning;
+            textBoxRemoteHost.Enabled = !syncRunning;
+            textBoxRemoteUser.Enabled = !syncRunning;
+            textBoxRemotePassword.Enabled = !syncRunning;
+
+            buttonStartStopSync.Text = syncRunning ? "&Stop Sync" : "&Start Sync";
+        }
 
         /// <summary>
         /// The user clicked the X button. Hide the window and minimize to the system tray
@@ -288,6 +395,11 @@ namespace SFTPSync
                 Hide();
                 ShowInTaskbar = false;
             }
+        }
+
+        private void checkBoxShowPassword_CheckedChanged(object sender, EventArgs e)
+        {
+            textBoxRemotePassword.UseSystemPasswordChar = !checkBoxShowPassword.Checked;
         }
     }
 }

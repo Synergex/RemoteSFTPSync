@@ -104,5 +104,51 @@ namespace SFTPSync
                 }
             }
         }
+
+        public static List<RemoteSync> remoteSyncs = new List<RemoteSync>();
+
+        public static Logger? Logger;
+
+        public static async void StartSync(Action<string> loggerAction)
+        {
+            if (Settings == null)
+                return;
+
+            Logger = new Logger();
+            Logger.LogUpdated += loggerAction;
+            Logger.Log("Starting sync...");
+
+            var director = new SyncDirector(Settings.LocalPath);
+
+            foreach (var split in Settings.LocalSearchPattern.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (remoteSyncs.Count > 0)
+                {
+                    await remoteSyncs[0].DoneMakingFolders;
+                }
+                remoteSyncs.Add(new RemoteSync(Settings.RemoteHost, Settings.RemoteUsername, Settings.RemotePassword, Settings.LocalPath, Settings.RemotePath, split, remoteSyncs.Count == 0, director));
+            }
+        }
+
+        public static void StopSync(Action<string> loggerAction)
+        {
+            foreach (var remoteSync in remoteSyncs)
+            {
+                try
+                {
+                    remoteSync.Dispose();
+                }
+                catch { /* Swallow any exceptions */ }
+            }
+
+            remoteSyncs.Clear();
+
+            if ( Logger != null)
+            {
+                Logger.Log("Stopping sync...");
+                Logger.LogUpdated -= loggerAction;
+                Logger = null;
+            }
+        }
     }
 }
