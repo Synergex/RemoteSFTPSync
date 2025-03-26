@@ -21,7 +21,7 @@
 
 		<!-- ************************************************************************************************************* -->
 		<!-- Set the icon to be used in "Programs & Features" -->
-		<Icon Id="SFTPSyncUIIcon" SourceFile="$(var.CloneRoot)SFTPSyncUI\SFTPSyncUI.ico"/>
+		<Icon Id="SFTPSyncUIIcon" SourceFile="$(var.CloneRoot)\SFTPSyncUI\SFTPSyncUI.ico"/>
 		<Property Id="ARPPRODUCTICON" Value="SFTPSyncUIIcon" />
 
 		<!-- ************************************************************************************************************* -->
@@ -52,77 +52,77 @@
 			<!-- SFTPSyncUI Application -->
 
 			<Component Id="SFTPSyncChm" Guid="*" Win64="yes">
-				<File Id="SFTPSyncChm" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\docs\SFTPSync.chm" KeyPath="yes" />
+				<File Id="SFTPSyncChm" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\docs\SFTPSync.chm" KeyPath="yes" />
 			</Component>
 
 			<Component Id="AppSettingsJson" Guid="*" Win64="yes">
-				<File Id="AppSettingsJson" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\appsettings.json" KeyPath="yes" />
+				<File Id="AppSettingsJson" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\appsettings.json" KeyPath="yes" />
 			</Component>
 
 			<Component Id="D3DCompiler47cor3Dll" Guid="*" Win64="yes">
-				<File Id="D3DCompiler47cor3Dll" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\D3DCompiler_47_cor3.dll" KeyPath="yes" />
+				<File Id="D3DCompiler47cor3Dll" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\D3DCompiler_47_cor3.dll" KeyPath="yes" />
 			</Component>
 
 			<Component Id="PenImcCor3Dll" Guid="*" Win64="yes">
-				<File Id="PenImcCor3Dll" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\PenImc_cor3.dll" KeyPath="yes" />
+				<File Id="PenImcCor3Dll" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\PenImc_cor3.dll" KeyPath="yes" />
 			</Component>
 
 			<Component Id="PresentationNativeCor3Dll" Guid="*" Win64="yes">
-				<File Id="PresentationNativeCor3Dll" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\PresentationNative_cor3.dll" KeyPath="yes" />
+				<File Id="PresentationNativeCor3Dll" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\PresentationNative_cor3.dll" KeyPath="yes" />
 			</Component>
 
 			<Component Id="RenciSshNetPdb" Guid="*" Win64="yes">
-				<File Id="RenciSshNetPdb" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\Renci.SshNet.pdb" KeyPath="yes" />
+				<File Id="RenciSshNetPdb" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\Renci.SshNet.pdb" KeyPath="yes" />
 			</Component>
 
 			<Component Id="RenciSshNetXml" Guid="*" Win64="yes">
-				<File Id="RenciSshNetXml" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\Renci.SshNet.xml" KeyPath="yes" />
+				<File Id="RenciSshNetXml" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\Renci.SshNet.xml" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncLibPdb" Guid="*" Win64="yes">
-				<File Id="SFTPSyncLibPdb" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncLib.pdb" KeyPath="yes" />
+				<File Id="SFTPSyncLibPdb" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncLib.pdb" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncUiExe" Guid="*" Win64="yes">
-				<File Id="SFTPSyncUiExe" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.exe" KeyPath="yes" />
+				<File Id="SFTPSyncUiExe" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.exe" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncUiIco" Guid="*" Win64="yes">
-				<File Id="SFTPSyncUiIco" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.ico" KeyPath="yes" />
+				<File Id="SFTPSyncUiIco" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.ico" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncUiPdb" Guid="*" Win64="yes">
-				<File Id="SFTPSyncUiPdb" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.pdb" KeyPath="yes" />
+				<File Id="SFTPSyncUiPdb" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.pdb" KeyPath="yes" />
 			</Component>
 
 			<Component Id="VCRuntime140Cor3Dll" Guid="*" Win64="yes">
-				<File Id="VCRuntime140Cor3Dll" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\vcruntime140_cor3.dll" />
+				<File Id="VCRuntime140Cor3Dll" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\vcruntime140_cor3.dll" />
 			</Component>
 
 			<Component Id="WpfGfxCor3Dll" Guid="*" Win64="yes">
-				<File Id="WpfGfxCor3Dll" Source="$(var.CloneRoot)SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\wpfgfx_cor3.dll" />
+				<File Id="WpfGfxCor3Dll" Source="$(var.CloneRoot)\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\wpfgfx_cor3.dll" />
 			</Component>
 
 			<!-- SFTPSync Application -->
 
 			<Component Id="SFTPSyncExe" Guid="*" Win64="yes">
-				<File Id="SFTPSyncExe" Source="$(var.CloneRoot)SFTPSync\bin\Release\net8.0-windows\publish\win-x64\SFTPSync.exe" KeyPath="yes" />
+				<File Id="SFTPSyncExe" Source="$(var.CloneRoot)\SFTPSync\bin\Release\net8.0-windows\publish\win-x64\SFTPSync.exe" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncPdb" Guid="*" Win64="yes">
-				<File Id="SFTPSyncPdb" Source="$(var.CloneRoot)SFTPSync\bin\Release\net8.0-windows\publish\win-x64\SFTPSync.pdb" KeyPath="yes" />
+				<File Id="SFTPSyncPdb" Source="$(var.CloneRoot)\SFTPSync\bin\Release\net8.0-windows\publish\win-x64\SFTPSync.pdb" KeyPath="yes" />
 			</Component>
 
 			<!-- SFTPSyncStop application -->
 
 			<Component Id="SFTPSyncStopExe" Guid="*" Win64="yes">
-				<File Id="SFTPSyncStopExe" Source="$(var.CloneRoot)SFTPSyncStop\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncStop.exe" />
+				<File Id="SFTPSyncStopExe" Source="$(var.CloneRoot)\SFTPSyncStop\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncStop.exe" />
 			</Component>
 
 			<!-- Other files -->
 
 			<Component Id="LicenseRtf" Guid="*" Win64="yes">
-				<File Id="LicenseRtf" Source="$(var.CloneRoot)SFTPSyncSetup\license.rtf" />
+				<File Id="LicenseRtf" Source="$(var.CloneRoot)\SFTPSyncSetup\license.rtf" />
 			</Component>
 
 		</DirectoryRef>

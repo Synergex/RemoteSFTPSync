@@ -29,7 +29,9 @@
     <IntermediateOutputPath>obj\$(Platform)\$(Configuration)\</IntermediateOutputPath>
   </PropertyGroup>
   <PropertyGroup>
-    <CloneRoot Condition="'$(CloneRoot)' == ''">$(SolutionDir)</CloneRoot>
+    <!-- Use pipeline-provided CloneRoot, or fallback to manually inferred path -->
+    <CloneRoot Condition="'$(CloneRoot)' == '' and '$(SolutionDir)' != ''">$(SolutionDir)</CloneRoot>
+    <CloneRoot Condition="'$(CloneRoot)' == '' and '$(MSBuildProjectDirectory)' != ''">$(MSBuildProjectDirectory)\..</CloneRoot>
     <DefineConstants>CloneRoot=$(CloneRoot)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>

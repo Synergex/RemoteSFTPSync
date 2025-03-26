@@ -58,7 +58,7 @@ jobs:
       shell: pwsh
 
     - name: Set solution directory environment variable
-      run: echo "CLONE_ROOT=$(pwd)\" >> $GITHUB_ENV
+      run: echo "CLONE_ROOT=$(pwd)" >> $GITHUB_ENV
 
     - name: Build WiX Setup Project
       run: |
