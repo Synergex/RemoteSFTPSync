@@ -123,14 +123,14 @@ namespace SFTPSyncLib
 
         public static Task UploadFileAsync(SftpClient sftp, Stream file, string destination)
         {
-            Func<Stream, string, AsyncCallback, object, IAsyncResult> begin = (stream, path, callback, state) => sftp.BeginUploadFile(stream, path, true, callback, state, null);
+            Func<Stream, string, AsyncCallback, object?, IAsyncResult> begin = (stream, path, callback, state) => sftp.BeginUploadFile(stream, path, true, callback, state, null);
             return Task.Factory.FromAsync(begin, sftp.EndUploadFile, file, destination, null);
         }
 
 
         public static Task<IEnumerable<ISftpFile>> ListDirectoryAsync(SftpClient sftp, string path)
         {
-            Func<string, AsyncCallback, object, IAsyncResult> begin = (bpath, callback, state) => sftp.BeginListDirectory(bpath, callback, state, null);
+            Func<string, AsyncCallback, object?, IAsyncResult> begin = (bpath, callback, state) => sftp.BeginListDirectory(bpath, callback, state, null);
             return Task.Factory.FromAsync(begin, sftp.EndListDirectory, path, null);
         }
 
@@ -161,18 +161,20 @@ namespace SFTPSyncLib
         }
 
 
-        private async void Fsw_Changed(object sender, FileSystemEventArgs arg)
+        private async void Fsw_Changed(object? sender, FileSystemEventArgs arg)
         {
             if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
                 || arg.ChangeType == WatcherChangeTypes.Renamed)
             {
                 var changedPath = Path.GetDirectoryName(arg.FullPath);
-                var relativePath = _localRootDirectory == changedPath ? "" : changedPath.Substring(_localRootDirectory.Length).Replace('\\', '/');
+                var relativePath = _localRootDirectory == changedPath ? "" : changedPath?.Substring(_localRootDirectory.Length).Replace('\\', '/');
                 var fullRemotePath = _remoteRootDirectory + relativePath;
                 await Task.Yield();
                 bool makeDirectory = true;
                 lock (_activeDirSync)
                 {
+                    if (changedPath == null)
+                        return;
                     if (_activeDirSync.Contains(changedPath))
                         makeDirectory = false;
                     else
@@ -219,7 +221,6 @@ namespace SFTPSyncLib
             {
                 _sftp.Dispose();
             }
-            _sftp = null;
         }
     }
 }

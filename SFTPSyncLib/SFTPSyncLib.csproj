@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Platforms>x64</Platforms>
+    <Platforms>x64;AnyCPU</Platforms>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
