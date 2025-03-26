@@ -49,70 +49,80 @@
 
 		<DirectoryRef Id="INSTALLFOLDER">
 
-			<!-- Published files -->
+			<!-- SFTPSyncUI Application -->
 
 			<Component Id="SFTPSyncChm" Guid="*" Win64="yes">
-				<File Id="SFTPSyncChm" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\docs\SFTPSync.chm" KeyPath="yes" />
+				<File Id="SFTPSyncChm" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\docs\SFTPSync.chm" KeyPath="yes" />
 			</Component>
 
 			<Component Id="AppSettingsJson" Guid="*" Win64="yes">
-				<File Id="AppSettingsJson" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\appsettings.json" KeyPath="yes" />
+				<File Id="AppSettingsJson" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\appsettings.json" KeyPath="yes" />
 			</Component>
 
 			<Component Id="D3DCompiler47cor3Dll" Guid="*" Win64="yes">
-				<File Id="D3DCompiler47cor3Dll" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\D3DCompiler_47_cor3.dll" KeyPath="yes" />
+				<File Id="D3DCompiler47cor3Dll" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\D3DCompiler_47_cor3.dll" KeyPath="yes" />
 			</Component>
 
 			<Component Id="PenImcCor3Dll" Guid="*" Win64="yes">
-				<File Id="PenImcCor3Dll" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\PenImc_cor3.dll" KeyPath="yes" />
+				<File Id="PenImcCor3Dll" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\PenImc_cor3.dll" KeyPath="yes" />
 			</Component>
 
 			<Component Id="PresentationNativeCor3Dll" Guid="*" Win64="yes">
-				<File Id="PresentationNativeCor3Dll" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\PresentationNative_cor3.dll" KeyPath="yes" />
+				<File Id="PresentationNativeCor3Dll" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\PresentationNative_cor3.dll" KeyPath="yes" />
 			</Component>
 
 			<Component Id="RenciSshNetPdb" Guid="*" Win64="yes">
-				<File Id="RenciSshNetPdb" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\Renci.SshNet.pdb" KeyPath="yes" />
+				<File Id="RenciSshNetPdb" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\Renci.SshNet.pdb" KeyPath="yes" />
 			</Component>
 
 			<Component Id="RenciSshNetXml" Guid="*" Win64="yes">
-				<File Id="RenciSshNetXml" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\Renci.SshNet.xml" KeyPath="yes" />
+				<File Id="RenciSshNetXml" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\Renci.SshNet.xml" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncLibPdb" Guid="*" Win64="yes">
-				<File Id="SFTPSyncLibPdb" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncLib.pdb" KeyPath="yes" />
+				<File Id="SFTPSyncLibPdb" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\SFTPSyncLib.pdb" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncUiExe" Guid="*" Win64="yes">
-				<File Id="SFTPSyncUiExe" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.exe" KeyPath="yes" />
+				<File Id="SFTPSyncUiExe" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\SFTPSyncUI.exe" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncUiIco" Guid="*" Win64="yes">
-				<File Id="SFTPSyncUiIco" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.ico" KeyPath="yes" />
+				<File Id="SFTPSyncUiIco" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\SFTPSyncUI.ico" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncUiPdb" Guid="*" Win64="yes">
-				<File Id="SFTPSyncUiPdb" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.pdb" KeyPath="yes" />
+				<File Id="SFTPSyncUiPdb" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\SFTPSyncUI.pdb" KeyPath="yes" />
 			</Component>
 
 			<Component Id="VCRuntime140Cor3Dll" Guid="*" Win64="yes" KeyPath="yes">
-				<File Id="VCRuntime140Cor3Dll" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\vcruntime140_cor3.dll" />
+				<File Id="VCRuntime140Cor3Dll" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\vcruntime140_cor3.dll" />
 			</Component>
 
 			<Component Id="WpfGfxCor3Dll" Guid="*" Win64="yes" KeyPath="yes">
-				<File Id="WpfGfxCor3Dll" Source="..\..\..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\wpfgfx_cor3.dll" />
+				<File Id="WpfGfxCor3Dll" Source="..\..\..\SFTPSyncUI\bin\x64\Release\net8.0-windows\publish\wpfgfx_cor3.dll" />
+			</Component>
+
+			<!-- SFTPSync Application -->
+
+			<Component Id="SFTPSyncExe" Guid="*" Win64="yes">
+				<File Id="SFTPSyncExe" Source="..\..\..\SFTPSync\bin\x64\Release\net8.0-windows\publish\SFTPSync.exe" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncPdb" Guid="*" Win64="yes">
+				<File Id="SFTPSyncPdb" Source="..\..\..\SFTPSync\bin\x64\Release\net8.0-windows\publish\SFTPSync.pdb" KeyPath="yes" />
+			</Component>
+
+			<!-- SFTPSyncStop application -->
+
+			<Component Id="SFTPSyncStopExe" Guid="*" Win64="yes" KeyPath="yes">
+				<File Id="SFTPSyncStopExe" Source="..\..\..\SFTPSyncStop\bin\x64\Release\net8.0-windows\publish\SFTPSyncStop.exe" />
 			</Component>
 
 			<!-- Other files -->
 
 			<Component Id="LicenseRtf" Guid="*" Win64="yes" KeyPath="yes">
 				<File Id="LicenseRtf" Source="..\..\license.rtf" />
-			</Component>
-
-			<!-- SFTPSyncStop application -->
-
-			<Component Id="SFTPSyncStopExe" Guid="*" Win64="yes" KeyPath="yes">
-				<File Id="SFTPSyncStopExe" Source="..\..\..\SFTPSyncStop\bin\Release\net8.0\publish\win-x64\SFTPSyncStop.exe" />
 			</Component>
 
 		</DirectoryRef>
@@ -124,8 +134,8 @@
 			<Shortcut
 				Id="SFTPSyncShortcut"
 				Name="SFTP Sync"
-				Description="Launch SFTP Sync"
-				Target="[INSTALLFOLDER]SFTPSync.exe"
+				Description="Open SFTP Sync"
+				Target="[INSTALLFOLDER]SFTPSyncUI.exe"
 				WorkingDirectory="INSTALLFOLDER" />
 
 			<!-- Ensure directory removal on uninstall -->
@@ -153,11 +163,11 @@
 		</Component>
 
 		<!-- ************************************************************************************************************* -->
-		<!-- Main (only) product feature -->
+		<!-- Main SFTPSyncUI product feature -->
 
 		<Feature
-			Id="ProductFeature"
-			Title="SFTP Sync Application"
+			Id="SFTPSyncUIFeature"
+			Title="SFTP Sync UI Application"
 			Description="This feature provides the main SFTP Sync application and is required."
 			Level="1"
 			Absent="disallow">
@@ -187,6 +197,25 @@
 
 		</Feature>
 
+		<!-- ************************************************************************************************************* -->
+		<!-- Command-line SFTPSync product feature -->
+
+		<Feature
+			Id="SFTPSyncFeature"
+			Title="SFTP Sync Command Line Application"
+			Description="This optional feature provides the main SFTP Sync command line application."
+			Level="1"
+			Absent="allow">
+
+			<!-- Published files -->
+			<ComponentRef Id="SFTPSyncExe" />
+			<ComponentRef Id="SFTPSyncPdb" />
+
+		</Feature>
+
+		<!-- ************************************************************************************************************* -->
+		<!-- Command-line SFTPSync product feature -->
+
 		<Feature
 			Id="DocumentationFeature"
 			Title="Documentation"
@@ -198,6 +227,9 @@
 			<ComponentRef Id="SFTPSyncChm" />
 
 		</Feature>
+
+		<!-- ************************************************************************************************************* -->
+		<!-- Custom action to try to stop the application(s) before uninstall -->
 
 		<CustomAction
 			Id="StopAppCustomAction"
