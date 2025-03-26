@@ -15,9 +15,10 @@ jobs:
       OutputDir: ${{ github.workspace }}/artifacts
 
     steps:
-    - name: Checkout source (with submodules)
+    - name: Checkout source (with full history and submodules)
       uses: actions/checkout@v4
       with:
+        fetch-depth: 0
         submodules: 'recursive'
 
     - name: Setup .NET 8 SDK
