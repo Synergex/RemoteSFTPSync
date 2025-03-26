@@ -58,11 +58,11 @@ jobs:
       shell: pwsh
 
     - name: Set solution directory environment variable
-      run: echo "SOLUTION_DIR=$(pwd)" >> $GITHUB_ENV
+      run: echo "CLONE_ROOT=$(pwd)\" >> $GITHUB_ENV
 
     - name: Build WiX Setup Project
       run: |
-        & "${{ steps.find-msbuild.outputs.path }}" "SFTPSyncSetup\SFTPSyncSetup.wixproj" /p:Configuration=Release /p:SolutionDir=${{ env.SOLUTION_DIR }}
+        & "${{ steps.find-msbuild.outputs.path }}" "SFTPSyncSetup\SFTPSyncSetup.wixproj" /p:Configuration=Release /p:CloneRoot=${{ env.CLONE_ROOT }}
       shell: pwsh
 
     - name: Upload MSI artifact
