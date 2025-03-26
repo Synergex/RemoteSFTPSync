@@ -57,9 +57,12 @@ jobs:
         "path=$msbuild" >> $env:GITHUB_OUTPUT
       shell: pwsh
 
+    - name: Set solution directory environment variable
+      run: echo "SOLUTION_DIR=$(pwd)" >> $GITHUB_ENV
+
     - name: Build WiX Setup Project
       run: |
-        & "${{ steps.find-msbuild.outputs.path }}" "SFTPSyncSetup\SFTPSyncSetup.wixproj" /p:Configuration=Release
+        & "${{ steps.find-msbuild.outputs.path }}" "SFTPSyncSetup\SFTPSyncSetup.wixproj" /p:Configuration=Release /p:SolutionDir=${{ env.SOLUTION_DIR }}
       shell: pwsh
 
     - name: Upload MSI artifact
