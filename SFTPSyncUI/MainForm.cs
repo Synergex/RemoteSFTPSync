@@ -1,8 +1,9 @@
 
+using SFTPSyncLib;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
-namespace SFTPSync
+namespace SFTPSyncUI
 {
     public partial class MainForm : Form
     {
@@ -25,7 +26,7 @@ namespace SFTPSync
             };
 
             // Can't happen, but suppresses "might be null" warnings
-            if (SFTPSync.Settings == null)
+            if (SFTPSyncUI.Settings == null)
             {
                 MessageBox.Show("Settings not loaded", Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Application.Exit();
@@ -106,15 +107,15 @@ namespace SFTPSync
 
             //Load the current settings
             initialUiLoad = true;
-            textBoxLocalPath.Text = SFTPSync.Settings.LocalPath;
-            textBoxSearchSpec.Text = SFTPSync.Settings.LocalSearchPattern;
-            textBoxRemoteHost.Text = SFTPSync.Settings.RemoteHost;
-            textBoxRemotePath.Text = SFTPSync.Settings.RemotePath;
-            textBoxRemoteUser.Text = SFTPSync.Settings.RemoteUsername;
-            textBoxRemotePassword.Text = DPAPIEncryption.Decrypt(SFTPSync.Settings.RemotePassword);
-            checkStartAtLogin.Checked = SFTPSync.Settings.StartAtLogin;
-            checkStartInTray.Checked = SFTPSync.Settings.StartInTray;
-            checkBoxAutoStartSync.Checked = SFTPSync.Settings.AutoStartSync;
+            textBoxLocalPath.Text = SFTPSyncUI.Settings.LocalPath;
+            textBoxSearchSpec.Text = SFTPSyncUI.Settings.LocalSearchPattern;
+            textBoxRemoteHost.Text = SFTPSyncUI.Settings.RemoteHost;
+            textBoxRemotePath.Text = SFTPSyncUI.Settings.RemotePath;
+            textBoxRemoteUser.Text = SFTPSyncUI.Settings.RemoteUsername;
+            textBoxRemotePassword.Text = DPAPIEncryption.Decrypt(SFTPSyncUI.Settings.RemotePassword);
+            checkStartAtLogin.Checked = SFTPSyncUI.Settings.StartAtLogin;
+            checkStartInTray.Checked = SFTPSyncUI.Settings.StartInTray;
+            checkBoxAutoStartSync.Checked = SFTPSyncUI.Settings.AutoStartSync;
             initialUiLoad = false;
 
             //Set the initial window visibility
@@ -153,9 +154,9 @@ namespace SFTPSync
 
             if (String.IsNullOrWhiteSpace(textBoxLocalPath.Text) || Directory.Exists(textBoxLocalPath.Text))
             {
-                if (SFTPSync.Settings != null)
+                if (SFTPSyncUI.Settings != null)
                 {
-                    SFTPSync.Settings.LocalPath = textBoxLocalPath.Text;
+                    SFTPSyncUI.Settings.LocalPath = textBoxLocalPath.Text;
                 }
             }
             enableDisableStartSync();
@@ -168,9 +169,9 @@ namespace SFTPSync
 
             if (String.IsNullOrWhiteSpace(textBoxLocalPath.Text) || searchSpecOK())
             {
-                if (SFTPSync.Settings != null)
+                if (SFTPSyncUI.Settings != null)
                 {
-                    SFTPSync.Settings.LocalSearchPattern = textBoxSearchSpec.Text;
+                    SFTPSyncUI.Settings.LocalSearchPattern = textBoxSearchSpec.Text;
                 }
             }
             enableDisableStartSync();
@@ -189,9 +190,9 @@ namespace SFTPSync
             if (initialUiLoad)
                 return;
 
-            if (SFTPSync.Settings != null)
+            if (SFTPSyncUI.Settings != null)
             {
-                SFTPSync.Settings.RemotePath = textBoxRemotePath.Text;
+                SFTPSyncUI.Settings.RemotePath = textBoxRemotePath.Text;
             }
             enableDisableStartSync();
         }
@@ -201,9 +202,9 @@ namespace SFTPSync
             if (initialUiLoad)
                 return;
 
-            if (SFTPSync.Settings != null)
+            if (SFTPSyncUI.Settings != null)
             {
-                SFTPSync.Settings.RemoteHost = textBoxRemoteHost.Text;
+                SFTPSyncUI.Settings.RemoteHost = textBoxRemoteHost.Text;
             }
             enableDisableStartSync();
         }
@@ -213,9 +214,9 @@ namespace SFTPSync
             if (initialUiLoad)
                 return;
 
-            if (SFTPSync.Settings != null)
+            if (SFTPSyncUI.Settings != null)
             {
-                SFTPSync.Settings.RemoteUsername = textBoxRemoteUser.Text;
+                SFTPSyncUI.Settings.RemoteUsername = textBoxRemoteUser.Text;
             }
             enableDisableStartSync();
         }
@@ -225,9 +226,9 @@ namespace SFTPSync
             if (initialUiLoad)
                 return;
 
-            if (SFTPSync.Settings != null)
+            if (SFTPSyncUI.Settings != null)
             {
-                SFTPSync.Settings.RemotePassword = DPAPIEncryption.Encrypt(textBoxRemotePassword.Text);
+                SFTPSyncUI.Settings.RemotePassword = DPAPIEncryption.Encrypt(textBoxRemotePassword.Text);
             }
             enableDisableStartSync();
         }
@@ -237,9 +238,9 @@ namespace SFTPSync
             if (initialUiLoad)
                 return;
 
-            if (SFTPSync.Settings != null)
+            if (SFTPSyncUI.Settings != null)
             {
-                SFTPSync.Settings.StartAtLogin = checkStartAtLogin.Checked;
+                SFTPSyncUI.Settings.StartAtLogin = checkStartAtLogin.Checked;
             }
         }
 
@@ -248,9 +249,9 @@ namespace SFTPSync
             if (initialUiLoad)
                 return;
 
-            if (SFTPSync.Settings != null)
+            if (SFTPSyncUI.Settings != null)
             {
-                SFTPSync.Settings.StartInTray = checkStartInTray.Checked;
+                SFTPSyncUI.Settings.StartInTray = checkStartInTray.Checked;
             }
         }
 
@@ -259,9 +260,9 @@ namespace SFTPSync
             if (initialUiLoad)
                 return;
 
-            if (SFTPSync.Settings != null)
+            if (SFTPSyncUI.Settings != null)
             {
-                SFTPSync.Settings.AutoStartSync = checkBoxAutoStartSync.Checked;
+                SFTPSyncUI.Settings.AutoStartSync = checkBoxAutoStartSync.Checked;
             }
         }
 
@@ -358,14 +359,14 @@ namespace SFTPSync
         {
             syncRunning = true;
             configureUI();
-            SFTPSync.StartSync(AppendLog);
+            SFTPSyncUI.StartSync(AppendLog);
         }
 
         private void stopSync()
         {
             syncRunning = false;
             configureUI();
-            SFTPSync.StopSync(AppendLog);
+            SFTPSyncUI.StopSync(AppendLog);
         }
 
         private void configureUI()

@@ -1,21 +1,15 @@
 ﻿
-using Renci.SshNet;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using SFTPSyncLib;
 
-namespace RemoteSFTPSync
+namespace SFTPSync
 {
-    class Program
+    class SFTPSync
     {
         static async Task Main(string[] args)
         {
             if (args.Length != 6)
             {
-                Console.WriteLine("usage: RemoteSFTPSyncCore host username password localRootDir remoteRootDir searchPattern");
+                Console.WriteLine("usage: SFTPSync host username password localRootDir remoteRootDir searchPattern");
             }
             else
             {
@@ -31,6 +25,7 @@ namespace RemoteSFTPSync
                 }
 
                 Console.Write("Remote SFTP file sync. Press Ctrl+C to exit: ");
+
                 while (true)
                 {
                     var key = Console.ReadKey(intercept: true);
@@ -51,7 +46,5 @@ namespace RemoteSFTPSync
                 }
             }
         }
-
-
     }
 }

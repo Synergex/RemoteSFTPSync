@@ -1,78 +1,9 @@
 ﻿
 using Renci.SshNet;
 using Renci.SshNet.Sftp;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace RemoteSFTPSync
+namespace SFTPSyncLib
 {
-    public class SyncDirector
-    {
-        FileSystemWatcher _fsw;
-        List<(Regex, Action<FileSystemEventArgs>)> callbacks = new List<(Regex, Action<FileSystemEventArgs>)>();
-
-        public SyncDirector(string rootFolder)
-        {
-            _fsw = new FileSystemWatcher(rootFolder, "*.*")
-            {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName
-            };
-
-            _fsw.Changed += Fsw_Changed;
-            _fsw.Created += Fsw_Created;
-            _fsw.Renamed += Fsw_Renamed;
-
-            _fsw.EnableRaisingEvents = true;
-        }
-
-        private void Fsw_Renamed(object sender, RenamedEventArgs e)
-        {
-            foreach (var (regex, callback) in callbacks)
-            {
-                if (regex.IsMatch(e.FullPath))
-                {
-                    callback(e);
-                }
-            }
-        }
-
-        private void Fsw_Created(object sender, FileSystemEventArgs e)
-        {
-            foreach (var (regex, callback) in callbacks)
-            {
-                if (regex.IsMatch(e.FullPath))
-                {
-                    callback(e);
-                }
-            }
-        }
-
-        public void AddCallback(string match, Action<FileSystemEventArgs> handler)
-        {
-            string regexPattern = "^" + Regex.Escape(match).Replace("\\*", ".*") + "$";
-            callbacks.Add((new Regex(regexPattern), handler));
-        }
-
-        private void Fsw_Changed(object sender, FileSystemEventArgs e)
-        {
-            foreach (var (regex, callback) in callbacks)
-            {
-                if (regex.IsMatch(e.FullPath))
-                {
-                    callback(e);
-                }
-            }
-        }
-    }
-
     public class RemoteSync : IDisposable
     {
         string _host;
@@ -100,7 +31,7 @@ namespace RemoteSFTPSync
             _sftp.Connect();
             DoneMakingFolders = createFolders ? CreateDirectories(_localRootDirectory, _remoteRootDirectory) : Task.CompletedTask;
             var tsk = InitialSync(_localRootDirectory, _remoteRootDirectory);
-            
+
             tsk.ContinueWith((tmp) =>
             {
                 _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
@@ -116,7 +47,8 @@ namespace RemoteSFTPSync
         {
             if (new DirectoryInfo(sourcePath).EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly).Any())
             {
-                Console.WriteLine($"Sync directory started {sourcePath} -> {destinationPath} with search pattern {searchPattern}");
+                Logger.Log($"Sync directory started {sourcePath} -> {destinationPath} with search pattern {searchPattern}");
+
                 return Task<IEnumerable<FileInfo>>.Factory.FromAsync(sftp.BeginSynchronizeDirectories,
                                                    sftp.EndSynchronizeDirectories, sourcePath,
                                                    destinationPath, searchPattern, null);
@@ -162,7 +94,8 @@ namespace RemoteSFTPSync
             }
             catch (Exception)
             {
-                Console.WriteLine("Failed while creating directories, did you have the initial root folder on the remote system?");
+                Logger.Log("Failed to create directories. Does the remote root folder exist?");
+
                 Environment.Exit(-1);
             }
         }
@@ -177,13 +110,13 @@ namespace RemoteSFTPSync
                     return item.Name.Remove(item.Name.IndexOf(".DIR", StringComparison.OrdinalIgnoreCase));
                 else
                     return item.Name;
-                });
+            });
             foreach (var item in localDirectories)
             {
                 var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
                 await InitialSync(localPath + "\\" + directoryName, remotePath + "/" + directoryName);
             }
-            
+
             await SyncDirectoryAsync(_sftp, localPath, remotePath, _searchPattern);
         }
 
@@ -259,7 +192,7 @@ namespace RemoteSFTPSync
                         _activeDirSync.Remove(changedPath);
                     }
                 }
-                
+
                 while (!IsFileReady(arg.FullPath))
                     await Task.Delay(50);
 
@@ -287,8 +220,6 @@ namespace RemoteSFTPSync
                 _sftp.Dispose();
             }
             _sftp = null;
-
-           
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿namespace SFTPSync
+﻿
+namespace SFTPSyncUI
 {
     partial class MainForm
     {

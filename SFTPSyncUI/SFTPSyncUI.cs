@@ -1,10 +1,11 @@
 
 using Microsoft.Win32;
+using SFTPSyncLib;
 using System.Reflection;
 
-namespace SFTPSync
+namespace SFTPSyncUI
 {
-    internal static class SFTPSync
+    internal static class SFTPSyncUI
     {
         static Mutex? mutex = null;
 
@@ -107,14 +108,11 @@ namespace SFTPSync
 
         public static List<RemoteSync> remoteSyncs = new List<RemoteSync>();
 
-        public static Logger? Logger;
-
         public static async void StartSync(Action<string> loggerAction)
         {
             if (Settings == null)
                 return;
 
-            Logger = new Logger();
             Logger.LogUpdated += loggerAction;
             Logger.Log("Starting sync...");
 
@@ -143,12 +141,8 @@ namespace SFTPSync
 
             remoteSyncs.Clear();
 
-            if ( Logger != null)
-            {
-                Logger.Log("Stopping sync...");
-                Logger.LogUpdated -= loggerAction;
-                Logger = null;
-            }
+            Logger.Log("Stopping sync...");
+            Logger.LogUpdated -= loggerAction;
         }
     }
 }

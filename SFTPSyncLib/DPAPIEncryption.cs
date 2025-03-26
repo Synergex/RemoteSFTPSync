@@ -2,9 +2,9 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace SFTPSync
+namespace SFTPSyncLib
 {
-    internal class DPAPIEncryption
+    public class DPAPIEncryption
     {
         public static string Encrypt(string plainText)
         {

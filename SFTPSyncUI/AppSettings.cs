@@ -1,13 +1,12 @@
 ﻿
-using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace SFTPSync
+namespace SFTPSyncUI
 {
     internal class AppSettings
     {
-        private static string DefaultSettingsFile = Path.Combine(Path.GetDirectoryName(SFTPSync.ExecutableFile) ?? "", "appsettings.json");
+        private static string DefaultSettingsFile = Path.Combine(Path.GetDirectoryName(SFTPSyncUI.ExecutableFile) ?? "", "appsettings.json");
         private static string SettingsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "SFTPSync.json");
         private static bool initialLoadSettings = true;
 

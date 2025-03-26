@@ -1,0 +1,53 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35327.3
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SFTPSync", "RemoteSFTPSync\SFTPSync.csproj", "{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Renci.SshNet", "SSH.NET\src\Renci.SshNet\Renci.SshNet.csproj", "{2F5F8C90-0BD1-424F-997C-7BC6280919D1}"
+EndProject
+Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "SFTPSyncSetup", "SFTPSyncSetup\SFTPSyncSetup.wixproj", "{5074CBCB-641B-4A9C-B3BC-8DD0B78810A6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFTPSyncUI", "SFTPSyncUI\SFTPSyncUI.csproj", "{84DE4273-4210-4577-831B-6B19F2C97C3F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFTPSyncStop", "SftpSyncStop\SFTPSyncStop.csproj", "{297F3972-ECB1-4BEB-858C-4FAE54349FDC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFTPSyncLib", "SFTPSyncLib\SFTPSyncLib.csproj", "{D0FF35C8-3122-4619-A0DE-AA2E28CE974F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Debug|x64.ActiveCfg = Debug|x64
+		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Debug|x64.Build.0 = Debug|x64
+		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Release|x64.ActiveCfg = Release|x64
+		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Release|x64.Build.0 = Release|x64
+		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Debug|x64.ActiveCfg = Debug|x64
+		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Debug|x64.Build.0 = Debug|x64
+		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Release|x64.ActiveCfg = Release|x64
+		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Release|x64.Build.0 = Release|x64
+		{5074CBCB-641B-4A9C-B3BC-8DD0B78810A6}.Debug|x64.ActiveCfg = Debug|x86
+		{5074CBCB-641B-4A9C-B3BC-8DD0B78810A6}.Release|x64.ActiveCfg = Release|x86
+		{84DE4273-4210-4577-831B-6B19F2C97C3F}.Debug|x64.ActiveCfg = Debug|x64
+		{84DE4273-4210-4577-831B-6B19F2C97C3F}.Debug|x64.Build.0 = Debug|x64
+		{84DE4273-4210-4577-831B-6B19F2C97C3F}.Release|x64.ActiveCfg = Release|x64
+		{84DE4273-4210-4577-831B-6B19F2C97C3F}.Release|x64.Build.0 = Release|x64
+		{297F3972-ECB1-4BEB-858C-4FAE54349FDC}.Debug|x64.ActiveCfg = Debug|x64
+		{297F3972-ECB1-4BEB-858C-4FAE54349FDC}.Debug|x64.Build.0 = Debug|x64
+		{297F3972-ECB1-4BEB-858C-4FAE54349FDC}.Release|x64.ActiveCfg = Release|x64
+		{297F3972-ECB1-4BEB-858C-4FAE54349FDC}.Release|x64.Build.0 = Release|x64
+		{D0FF35C8-3122-4619-A0DE-AA2E28CE974F}.Debug|x64.ActiveCfg = Debug|x64
+		{D0FF35C8-3122-4619-A0DE-AA2E28CE974F}.Debug|x64.Build.0 = Debug|x64
+		{D0FF35C8-3122-4619-A0DE-AA2E28CE974F}.Release|x64.ActiveCfg = Release|x64
+		{D0FF35C8-3122-4619-A0DE-AA2E28CE974F}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E3A77139-D17E-4D1B-B0B4-CCE29731C9C4}
+	EndGlobalSection
+EndGlobal

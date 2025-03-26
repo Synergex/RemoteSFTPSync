@@ -1,7 +1,7 @@
 ﻿
 using System.Text.RegularExpressions;
 
-namespace SFTPSync
+namespace SFTPSyncLib
 {
     public class SyncDirector
     {
