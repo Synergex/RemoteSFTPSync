@@ -35,7 +35,7 @@ namespace SFTPSyncLib
             }
         }
 
-        public static void Log(string message)
+        private static void Log(string message)
         {
             switch (_mode)
             {
@@ -47,6 +47,20 @@ namespace SFTPSyncLib
                     LogUpdated?.Invoke(message);
                     break;
             }
+        }
+        public static void LogInfo(string message)
+        {
+            Log($"INF: {message}");
+        }
+
+        public static void LogWarnig(string message)
+        {
+            Log($"WRN: {message}");
+        }
+
+        public static void LogError(string message)
+        {
+            Log($"ERR: {message}");
         }
     }
 }

@@ -47,7 +47,7 @@ namespace SFTPSyncLib
         {
             if (new DirectoryInfo(sourcePath).EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly).Any())
             {
-                Logger.Log($"Sync directory started {sourcePath} -> {destinationPath} with search pattern {searchPattern}");
+                Logger.LogInfo($"Sync started for {sourcePath}\\{searchPattern} -> {destinationPath}");
 
                 return Task<IEnumerable<FileInfo>>.Factory.FromAsync(sftp.BeginSynchronizeDirectories,
                                                    sftp.EndSynchronizeDirectories, sourcePath,
@@ -94,7 +94,7 @@ namespace SFTPSyncLib
             }
             catch (Exception)
             {
-                Logger.Log("Failed to create directories. Does the remote root folder exist?");
+                Logger.LogError("Failed to create directories. Check the remote root directory exists.");
 
                 Environment.Exit(-1);
             }
