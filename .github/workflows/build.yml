@@ -41,11 +41,29 @@ jobs:
     - name: Publish SFTPSyncUI
       run: dotnet publish SFTPSyncUI/SFTPSyncUI.csproj --configuration Release --output ${{ env.OutputDir }}/SFTPSyncUI
 
+    - name: Install WiX Toolset 3.14
+      run: |
+        choco install wix --version=3.14.0 --no-progress
+    
     - name: Add WiX Toolset to PATH
-      run: echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $env:GITHUB_PATH
+      run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" >> $env:GITHUB_PATH
 
-    - name: Build WiX MSI
-      run: msbuild SFTPSyncSetup/SFTPSyncSetup.wixproj /p:Configuration=Release
+    - name: Find MSBuild path
+      id: find-msbuild
+      run: |
+        $msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+        if (!(Test-Path $msbuild)) {
+          $msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe"
+        }
+        if (!(Test-Path $msbuild)) {
+          $msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
+        }
+        echo "##[set-output name=path]$msbuild"
+      shell: pwsh
+
+    - name: Build WiX Setup Project
+      run: '"${{ steps.find-msbuild.outputs.path }}" SFTPSyncSetup\SFTPSyncSetup.wixproj /p:Configuration=Release'
+      shell: pwsh
 
     - name: Upload MSI artifact
       uses: actions/upload-artifact@v4
