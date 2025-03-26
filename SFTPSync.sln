@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35327.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SFTPSync", "SFTPSync\SFTPSync.csproj", "{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Renci.SshNet", "SSH.NET\src\Renci.SshNet\Renci.SshNet.csproj", "{2F5F8C90-0BD1-424F-997C-7BC6280919D1}"
 EndProject
 Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "SFTPSyncSetup", "SFTPSyncSetup\SFTPSyncSetup.wixproj", "{5074CBCB-641B-4A9C-B3BC-8DD0B78810A6}"
@@ -15,16 +13,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFTPSyncStop", "SftpSyncSto
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFTPSyncLib", "SFTPSyncLib\SFTPSyncLib.csproj", "{D0FF35C8-3122-4619-A0DE-AA2E28CE974F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFTPSync", "SFTPSync\SFTPSync.csproj", "{F5D8FE33-58DD-0995-1195-5EBDB35FA0CB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Debug|x64.ActiveCfg = Debug|x64
-		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Debug|x64.Build.0 = Debug|x64
-		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Release|x64.ActiveCfg = Release|x64
-		{78CE1CF5-10B3-4BAD-9EE2-EDF32D138338}.Release|x64.Build.0 = Release|x64
 		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Debug|x64.ActiveCfg = Debug|x64
 		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Debug|x64.Build.0 = Debug|x64
 		{2F5F8C90-0BD1-424F-997C-7BC6280919D1}.Release|x64.ActiveCfg = Release|x64
@@ -43,6 +39,10 @@ Global
 		{D0FF35C8-3122-4619-A0DE-AA2E28CE974F}.Debug|x64.Build.0 = Debug|x64
 		{D0FF35C8-3122-4619-A0DE-AA2E28CE974F}.Release|x64.ActiveCfg = Release|x64
 		{D0FF35C8-3122-4619-A0DE-AA2E28CE974F}.Release|x64.Build.0 = Release|x64
+		{F5D8FE33-58DD-0995-1195-5EBDB35FA0CB}.Debug|x64.ActiveCfg = Debug|x64
+		{F5D8FE33-58DD-0995-1195-5EBDB35FA0CB}.Debug|x64.Build.0 = Debug|x64
+		{F5D8FE33-58DD-0995-1195-5EBDB35FA0CB}.Release|x64.ActiveCfg = Release|x64
+		{F5D8FE33-58DD-0995-1195-5EBDB35FA0CB}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
