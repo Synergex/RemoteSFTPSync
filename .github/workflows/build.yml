@@ -41,9 +41,9 @@ jobs:
     - name: Publish SFTPSyncUI
       run: dotnet publish SFTPSyncUI/SFTPSyncUI.csproj --configuration Release --output ${{ env.OutputDir }}/SFTPSyncUI
 
-    - name: Install WiX Toolset 3.14
+    - name: Install WiX Toolset
       run: |
-        choco install wix --version=3.14.0 --no-progress
+        choco install wixtoolset choco install wixtoolset --version=3.14.1 --no-progress
     
     - name: Add WiX Toolset to PATH
       run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" >> $env:GITHUB_PATH
