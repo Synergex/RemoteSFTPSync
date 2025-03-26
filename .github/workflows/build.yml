@@ -1,0 +1,52 @@
+name: Build and Package .NET 8 Solution
+
+on:
+  push:
+    branches:
+      - WindowsService
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    env:
+      Configuration: Release
+      OutputDir: ${{ github.workspace }}/artifacts
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.x'
+
+    - name: Restore NuGet packages
+      run: dotnet restore
+
+    - name: Build solution
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Publish SFTPSync
+      run: dotnet publish SFTPSync/SFTPSync.csproj --configuration Release --output ${{ env.OutputDir }}/SFTPSync
+
+    - name: Publish SFTPSyncStop
+      run: dotnet publish SFTPSyncStop/SFTPSyncStop.csproj --configuration Release --output ${{ env.OutputDir }}/SFTPSyncStop
+
+    - name: Publish SFTPSyncUI
+      run: dotnet publish SFTPSyncUI/SFTPSyncUI.csproj --configuration Release --output ${{ env.OutputDir }}/SFTPSyncUI
+
+    - name: Add WiX Toolset to PATH
+      run: echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $env:GITHUB_PATH
+
+    - name: Build WiX MSI
+      run: msbuild SFTPSyncSetup/SFTPSyncSetup.wixproj /p:Configuration=Release
+
+    - name: Upload MSI artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MSI
+        path: |
+          **\*.msi
