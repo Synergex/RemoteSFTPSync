@@ -29,7 +29,8 @@
     <IntermediateOutputPath>obj\$(Platform)\$(Configuration)\</IntermediateOutputPath>
   </PropertyGroup>
   <PropertyGroup>
-    <DefineConstants>CloneRoot=$(SolutionDir)</DefineConstants>
+    <CloneRoot Condition="'$(CloneRoot)' == ''">$(SolutionDir)</CloneRoot>
+    <DefineConstants>CloneRoot=$(CloneRoot)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Product.wxs" />
