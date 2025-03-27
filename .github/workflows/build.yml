@@ -33,13 +33,13 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Publish SFTPSync
-      run: dotnet publish SFTPSync/SFTPSync.csproj --configuration Release --output ${{ env.OutputDir }}/SFTPSync
+      run: dotnet publish SFTPSync/SFTPSync.csproj --configuration Release --output SFTPSync/bin/Release/net8.0-windows/publish/win-x64/
 
     - name: Publish SFTPSyncStop
-      run: dotnet publish SFTPSyncStop/SFTPSyncStop.csproj --configuration Release --output ${{ env.OutputDir }}/SFTPSyncStop
+      run: dotnet publish SFTPSyncStop/SFTPSyncStop.csproj --configuration Release --output SFTPSyncStop/bin/Release/net8.0-windows/publish/win-x64/
 
     - name: Publish SFTPSyncUI
-      run: dotnet publish SFTPSyncUI/SFTPSyncUI.csproj --configuration Release --output ${{ env.OutputDir }}/SFTPSyncUI
+      run: dotnet publish SFTPSyncUI/SFTPSyncUI.csproj --configuration Release --output SFTPSyncUI/bin/Release/net8.0-windows/publish/win-x64/
 
     - name: Add WiX Toolset to PATH
       run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" >> $env:GITHUB_PATH
