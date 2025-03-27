@@ -8,7 +8,8 @@ namespace SFTPSyncUI
 {
     internal static class SFTPSyncUI
     {
-        public static string ExecutableFile = Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
+        public static string ExecutableFile = String.Empty;
+
         public static AppSettings? Settings { get; private set; }
 
         private const string autoRunRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -20,6 +21,10 @@ namespace SFTPSyncUI
         [STAThread]
         static void Main()
         {
+            string? processPath = Environment.ProcessPath;
+            if (processPath != null)
+                ExecutableFile = Path.ChangeExtension(processPath, ".exe");
+
             // Check if another instance is already running and if so, tell it to show its window, then exit
             bool createdNew;
             Mutex mutex = new Mutex(true, $"Global\\SFTPSyncUI", out createdNew);
@@ -147,7 +152,7 @@ namespace SFTPSyncUI
             {
                 if (key != null)
                 {
-                    key.SetValue(Application.ProductName, $"\"{Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe")}\"");
+                    key.SetValue(Application.ProductName, $"\"{ExecutableFile}\"");
                 }
             }
         }
