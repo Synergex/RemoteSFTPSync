@@ -33,13 +33,37 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Publish SFTPSync
-      run: dotnet publish SFTPSync/SFTPSync.csproj --configuration Release --output SFTPSync/bin/Release/net8.0-windows/publish/win-x64/
+      run: |
+        dotnet publish SFTPSync/SFTPSync.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          --output SFTPSync/bin/Release/net8.0-windows/publish/win-x64/ `
+          /p:PublishSingleFile=true `
+          /p:PublishTrimmed=true `
+          /p:PublishReadyToRun=true
 
     - name: Publish SFTPSyncStop
-      run: dotnet publish SFTPSyncStop/SFTPSyncStop.csproj --configuration Release --output SFTPSyncStop/bin/Release/net8.0-windows/publish/win-x64/
+      run: |
+        dotnet publish SFTPSyncStop/SFTPSyncStop.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          --output SFTPSyncStop/bin/Release/net8.0-windows/publish/win-x64/ `
+          /p:PublishSingleFile=true `
+          /p:PublishTrimmed=true `
+          /p:PublishReadyToRun=true
 
     - name: Publish SFTPSyncUI
-      run: dotnet publish SFTPSyncUI/SFTPSyncUI.csproj --configuration Release --output SFTPSyncUI/bin/Release/net8.0-windows/publish/win-x64/
+      run: |
+        dotnet publish SFTPSyncUI/SFTPSyncUI.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          --output SFTPSyncUI/bin/Release/net8.0-windows/publish/win-x64/ `
+          /p:PublishSingleFile=true `
+          /p:PublishTrimmed=true `
+          /p:PublishReadyToRun=true
 
     - name: Add WiX Toolset to PATH
       run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" >> $env:GITHUB_PATH
