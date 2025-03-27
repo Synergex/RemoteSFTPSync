@@ -1,6 +1,7 @@
 
 using Microsoft.Win32;
 using SFTPSyncLib;
+using System.IO.Pipes;
 using System.Reflection;
 
 namespace SFTPSyncUI
@@ -11,6 +12,7 @@ namespace SFTPSyncUI
         public static AppSettings? Settings { get; private set; }
 
         private const string autoRunRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string pipeName = "SFTPSyncUIPipe";
 
         /// <summary>
         ///  The main entry point for the application.
@@ -18,12 +20,29 @@ namespace SFTPSyncUI
         [STAThread]
         static void Main()
         {
-            // Check if another instance is already running and if so, exit
+            // Check if another instance is already running and if so, tell it to show its window, then exit
             bool createdNew;
             Mutex mutex = new Mutex(true, $"Global\\SFTPSyncUI", out createdNew);
+
             if (!createdNew)
             {
-                MessageBox.Show($"Another instance of {Application.ProductName} is already running.", Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                try
+                {
+                    using (var client = new NamedPipeClientStream(".", pipeName, PipeDirection.Out))
+                    {
+                        client.Connect(1000); // 1 second timeout
+                        using (var writer = new StreamWriter(client) { AutoFlush = true })
+                        {
+                            writer.WriteLine("SHOW");
+                        }
+                    }
+                }
+                catch
+                {
+                    // If the pipe isn't available, ignore error
+                }
+
+                // Then exit this instance
                 Application.Exit();
                 return;
             }
@@ -54,10 +73,57 @@ namespace SFTPSyncUI
             else if (!Settings.StartAtLogin && IsProgramInStartup())
                 RemoveProgramFromStartup();
 
+            // Create an OpenPipe server to listen for messages from other instances
+            StartPipeServer();
+
             // Run the main form (it will start hidden, but put an icon in the system tray)
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new MainForm());
+        }
+
+        /// <summary>
+        /// Start the named pipe server to listen for messages from other instances
+        /// </summary>
+        private static void StartPipeServer()
+        {
+            Task.Run(() =>
+            {
+                while (true)
+                {
+                    using (var server = new NamedPipeServerStream(pipeName, PipeDirection.In))
+                    {
+                        server.WaitForConnection();
+                        using (var reader = new StreamReader(server))
+                        {
+                            var command = reader.ReadLine();
+                            if (command == "SHOW")
+                            {
+                                ShowMainWindow();
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// Show the main window
+        /// </summary>
+        private static void ShowMainWindow()
+        {
+            // Needs to be run on UI thread
+            Application.OpenForms[0]?.BeginInvoke((Action)(() =>
+            {
+                var form = Application.OpenForms[0];
+
+                if (form?.WindowState == FormWindowState.Minimized)
+                    form.WindowState = FormWindowState.Normal;
+
+                form?.Show();
+                form?.BringToFront();
+                form?.Activate();
+            }));
         }
 
         /// <summary>
