@@ -1,4 +1,5 @@
 
+using Renci.SshNet;
 using SFTPSyncLib;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -202,9 +203,10 @@ namespace SFTPSyncUI
             if (initialUiLoad)
                 return;
 
-            if (SFTPSyncUI.Settings != null)
+            if (SFTPSyncUI.Settings != null && !SFTPSyncUI.Settings.RemoteHost.Equals(textBoxRemoteHost.Text))
             {
                 SFTPSyncUI.Settings.RemoteHost = textBoxRemoteHost.Text;
+                SFTPSyncUI.Settings.AccessVerified = false;
             }
             enableDisableStartSync();
         }
@@ -214,9 +216,10 @@ namespace SFTPSyncUI
             if (initialUiLoad)
                 return;
 
-            if (SFTPSyncUI.Settings != null)
+            if (SFTPSyncUI.Settings != null && !SFTPSyncUI.Settings.RemoteUsername.Equals(textBoxRemoteUser.Text))
             {
                 SFTPSyncUI.Settings.RemoteUsername = textBoxRemoteUser.Text;
+                SFTPSyncUI.Settings.AccessVerified = false;
             }
             enableDisableStartSync();
         }
@@ -226,9 +229,10 @@ namespace SFTPSyncUI
             if (initialUiLoad)
                 return;
 
-            if (SFTPSyncUI.Settings != null)
+            if (SFTPSyncUI.Settings != null && !SFTPSyncUI.Settings.RemotePassword.Equals(DPAPIEncryption.Encrypt(textBoxRemotePassword.Text)))
             {
                 SFTPSyncUI.Settings.RemotePassword = DPAPIEncryption.Encrypt(textBoxRemotePassword.Text);
+                SFTPSyncUI.Settings.AccessVerified = false;
             }
             enableDisableStartSync();
         }
@@ -294,6 +298,20 @@ namespace SFTPSyncUI
 
         private bool enableDisableStartSync()
         {
+            if (SFTPSyncUI.Settings == null)
+                return false;
+
+            buttonVerifyAccess.Enabled = SFTPSyncUI.Settings.AccessVerified == false
+                && !String.IsNullOrWhiteSpace(textBoxRemoteHost.Text)
+                && !String.IsNullOrWhiteSpace(textBoxRemoteUser.Text)
+                && !String.IsNullOrWhiteSpace(textBoxRemotePassword.Text);
+
+            if (SFTPSyncUI.Settings.AccessVerified == false)
+            {
+                buttonStartStopSync.Enabled = false;
+                return false;
+            }
+
             bool allOk = true;
 
             //Local path validation (must be non-blank and a valid directory)
@@ -401,6 +419,43 @@ namespace SFTPSyncUI
         private void checkBoxShowPassword_CheckedChanged(object sender, EventArgs e)
         {
             textBoxRemotePassword.UseSystemPasswordChar = !checkBoxShowPassword.Checked;
+        }
+
+        private void buttonVerifyAccess_Click(object sender, EventArgs e)
+        {
+            //We get here if any of remote host, user and password all have values, and
+            //one or more of them have changed, and the user clicked the "Verify Access"
+            //button. We'll verify by attempting to make an SFTP connection to the remote
+            //system using the credentials provided.
+
+            using (SftpClient sftp = new SftpClient(textBoxRemoteHost.Text, textBoxRemoteUser.Text, textBoxRemotePassword.Text))
+            {
+                if (SFTPSyncUI.Settings == null)
+                    return;
+
+                try
+                {
+                    Cursor.Current = Cursors.WaitCursor;
+                    sftp.Connect();
+                    Cursor.Current = Cursors.Default;
+                    MessageBox.Show("Access verified.", "Access Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    SFTPSyncUI.Settings.AccessVerified = true;
+                    enableDisableStartSync();
+                }
+                catch (Exception)
+                {
+                    Cursor.Current = Cursors.Default;
+                    MessageBox.Show("Failed to verify access.", "Access Check", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                finally
+                {
+                    if (sftp != null && sftp.IsConnected)
+                    {
+                        sftp.Disconnect();
+                    }
+                }
+            }
+
         }
     }
 }

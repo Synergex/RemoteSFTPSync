@@ -136,6 +136,25 @@ namespace SFTPSyncUI
             }
         }
 
+        // Access verified
+
+        private bool accessVerified = false;
+        public bool AccessVerified
+        {
+            get => accessVerified;
+            set
+            {
+                if (accessVerified != value)
+                {
+                    accessVerified = value;
+                    if (!initialLoadSettings)
+                    {
+                        SaveToFile();
+                    }
+                }
+            }
+        }
+
         //Local path
 
         private string localPath = String.Empty;

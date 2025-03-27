@@ -33,6 +33,7 @@ namespace SFTPSyncUI
             checkStartAtLogin = new CheckBox();
             checkStartInTray = new CheckBox();
             groupBoxSettings = new GroupBox();
+            buttonVerifyAccess = new Button();
             buttonStartStopSync = new Button();
             checkBoxShowPassword = new CheckBox();
             checkBoxAutoStartSync = new CheckBox();
@@ -77,6 +78,7 @@ namespace SFTPSyncUI
             // 
             // groupBoxSettings
             // 
+            groupBoxSettings.Controls.Add(buttonVerifyAccess);
             groupBoxSettings.Controls.Add(buttonStartStopSync);
             groupBoxSettings.Controls.Add(checkBoxShowPassword);
             groupBoxSettings.Controls.Add(checkBoxAutoStartSync);
@@ -102,6 +104,17 @@ namespace SFTPSyncUI
             groupBoxSettings.TabIndex = 4;
             groupBoxSettings.TabStop = false;
             groupBoxSettings.Text = "Settings";
+            // 
+            // buttonVerifyAccess
+            // 
+            buttonVerifyAccess.Enabled = false;
+            buttonVerifyAccess.Location = new Point(941, 128);
+            buttonVerifyAccess.Name = "buttonVerifyAccess";
+            buttonVerifyAccess.Size = new Size(104, 29);
+            buttonVerifyAccess.TabIndex = 19;
+            buttonVerifyAccess.Text = "&Verify Access";
+            buttonVerifyAccess.UseVisualStyleBackColor = true;
+            buttonVerifyAccess.Click += buttonVerifyAccess_Click;
             // 
             // buttonStartStopSync
             // 
@@ -301,5 +314,6 @@ namespace SFTPSyncUI
         private CheckBox checkBoxAutoStartSync;
         private CheckBox checkBoxShowPassword;
         private Button buttonStartStopSync;
+        private Button buttonVerifyAccess;
     }
 }
