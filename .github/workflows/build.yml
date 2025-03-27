@@ -94,6 +94,7 @@ jobs:
             }
           } else {
             Write-Host "Directory $dir not found"
+          }
         }
 
     - name: Add WiX Toolset to PATH
