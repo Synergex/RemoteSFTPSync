@@ -7,8 +7,6 @@ namespace SFTPSyncUI
 {
     internal static class SFTPSyncUI
     {
-        static Mutex? mutex = null;
-
         public static string ExecutableFile = Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
         public static AppSettings? Settings { get; private set; }
 
@@ -21,9 +19,9 @@ namespace SFTPSyncUI
         static void Main()
         {
             // Check if another instance is already running and if so, exit
-            const string mutexName = $"Global\\SFTPSync";
+            const string mutexName = $"Global\\SFTPSyncUI";
             bool createdNew;
-            mutex = new Mutex(true, mutexName, out createdNew);
+            Mutex mutex = new Mutex(true, mutexName, out createdNew);
             if (!createdNew)
             {
                 MessageBox.Show($"Another instance of {Application.ProductName} is already running.", Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Information);
