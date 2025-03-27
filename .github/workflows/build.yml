@@ -40,7 +40,6 @@ jobs:
           --self-contained true `
           --output SFTPSync/bin/Release/net8.0-windows/publish/win-x64/ `
           /p:PublishSingleFile=true `
-          /p:PublishTrimmed=true `
           /p:PublishReadyToRun=true
 
     - name: Publish SFTPSyncStop
@@ -51,7 +50,6 @@ jobs:
           --self-contained true `
           --output SFTPSyncStop/bin/Release/net8.0-windows/publish/win-x64/ `
           /p:PublishSingleFile=true `
-          /p:PublishTrimmed=true `
           /p:PublishReadyToRun=true
 
     - name: Publish SFTPSyncUI
@@ -62,7 +60,6 @@ jobs:
           --self-contained true `
           --output SFTPSyncUI/bin/Release/net8.0-windows/publish/win-x64/ `
           /p:PublishSingleFile=true `
-          /p:PublishTrimmed=true `
           /p:PublishReadyToRun=true
 
     - name: Add WiX Toolset to PATH
