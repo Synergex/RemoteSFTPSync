@@ -14,17 +14,27 @@ namespace SFTPSync
             else
             {
                 var director = new SyncDirector(args[3]);
-                List<RemoteSync> remoteSyncs = new List<RemoteSync>();
-                foreach (var split in args[5].Split(';', StringSplitOptions.RemoveEmptyEntries))
+                List<RemoteSync> remoteSyncWorkers = new List<RemoteSync>();
+
+                Logger.LogInfo("Starting initial sync...");
+
+                foreach (var pattern in args[5].Split(';', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    if (remoteSyncs.Count > 0)
+                    if (remoteSyncWorkers.Count > 0)
                     {
-                        await remoteSyncs[0].DoneMakingFolders;
+                        await remoteSyncWorkers[0].DoneMakingFolders;
                     }
-                    remoteSyncs.Add(new RemoteSync(args[0], args[1], args[2], args[3], args[4], split, remoteSyncs.Count == 0, director));
+                    remoteSyncWorkers.Add(new RemoteSync(args[0], args[1], args[2], args[3], args[4], pattern, remoteSyncWorkers.Count == 0, director));
+
+                    Logger.LogInfo($"Started sync worker {remoteSyncWorkers.Count} for pattern {pattern}");
                 }
 
-                Console.Write("Remote SFTP file sync. Press Ctrl+C to exit: ");
+                //Wait for all sync workers to finish initial sync then tell the user
+                await Task.WhenAll(remoteSyncWorkers.Select(rsw => rsw.DoneInitialSync));
+
+                Logger.LogInfo("Initial sync complete, real-time sync now active");
+
+                Console.Write("Press Ctrl+C to exit: ");
 
                 while (true)
                 {
@@ -36,7 +46,7 @@ namespace SFTPSync
                     }
                 }
 
-                foreach (var remoteSync in remoteSyncs)
+                foreach (var remoteSync in remoteSyncWorkers)
                 {
                     try
                     {

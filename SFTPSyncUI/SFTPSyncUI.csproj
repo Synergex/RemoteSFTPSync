@@ -9,6 +9,16 @@
     <Title>SFTP Sync</Title>
     <ApplicationIcon>SFTPSyncUI.ico</ApplicationIcon>
     <Platforms>AnyCPU;x64</Platforms>
+    <PackageId>Synergex.$(AssemblyName)</PackageId>
+    <Authors>Steve Ives</Authors>
+    <Description>A tool that can be used to synchronize a Windows development environments source files to a matching directory tree on an OpenVMS system.</Description>
+    <Copyright>(c) Copyright Synergex International, Inc, 2025</Copyright>
+    <PackageProjectUrl>https://github.com/Synergex/RemoteSFTPSync</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Synergex/RemoteSFTPSync</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +36,17 @@
     <Content Include="SFTPSyncUI.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

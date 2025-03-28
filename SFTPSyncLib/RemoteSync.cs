@@ -17,6 +17,7 @@ namespace SFTPSyncLib
         HashSet<string> _activeDirSync = new HashSet<string>();
 
         public Task DoneMakingFolders { get; }
+        public Task DoneInitialSync { get; }
 
         public RemoteSync(string host, string username, string password, string localRootDirectory, string remoteRootDirectory, string searchPattern, bool createFolders, SyncDirector director)
         {
@@ -29,10 +30,12 @@ namespace SFTPSyncLib
             _director = director;
             _sftp = new SftpClient(host, username, password);
             _sftp.Connect();
-            DoneMakingFolders = createFolders ? CreateDirectories(_localRootDirectory, _remoteRootDirectory) : Task.CompletedTask;
-            var tsk = InitialSync(_localRootDirectory, _remoteRootDirectory);
 
-            tsk.ContinueWith((tmp) =>
+            DoneMakingFolders = createFolders ? CreateDirectories(_localRootDirectory, _remoteRootDirectory) : Task.CompletedTask;
+
+            DoneInitialSync = InitialSync(_localRootDirectory, _remoteRootDirectory);
+
+            DoneInitialSync.ContinueWith((tmp) =>
             {
                 _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
             });

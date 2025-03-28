@@ -12,12 +12,14 @@ namespace SFTPSyncUI
         private ContextMenuStrip contextMenu;
         private bool initialUiLoad = false;
         private bool syncRunning = false;
+        private string helpFilePath = string.Empty;
 
         public MainForm()
         {
             InitializeComponent();
 
             // Create a system tray icon
+
             contextMenu = new ContextMenuStrip();
             notifyIcon = new NotifyIcon
             {
@@ -26,7 +28,7 @@ namespace SFTPSyncUI
                 Visible = true
             };
 
-            // Can't happen, but suppresses "might be null" warnings
+            // Can't happen, but suppresses "might be null" warnings below
             if (SFTPSyncUI.Settings == null)
             {
                 MessageBox.Show("Settings not loaded", Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -46,7 +48,7 @@ namespace SFTPSyncUI
             // Conditionally add the Help item
 
             // Path when installed
-            string helpFilePath = Path.Combine(Application.StartupPath, "SFTPSync.chm");
+            helpFilePath = Path.Combine(Application.StartupPath, "SFTPSync.chm");
 
             if (!File.Exists(helpFilePath))
             {
@@ -58,23 +60,9 @@ namespace SFTPSyncUI
             {
                 contextMenu.Items.Add("Help", null, (s, e) =>
                 {
-                    try
-                    {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = "hh.exe",
-                            Arguments = $"\"{helpFilePath}\"",
-                            UseShellExecute = false
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Unable to open help file. {ex.Message}",
-                            Application.ProductName,
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
-                    }
+                    ShowHelp();
                 });
+                mnuHelpView.Enabled = true;
             }
 
             contextMenu.Items.Add(new ToolStripSeparator());
@@ -82,16 +70,7 @@ namespace SFTPSyncUI
             contextMenu.Items.Add("Exit", null, (s, e) =>
             {
                 //The user asked us to close the application
-
-                // Stop the sync process if it is running
-                if (syncRunning)
-                {
-                    stopSync();
-                }
-
-                //And close the application
-                notifyIcon.Visible = false;
-                Application.Exit();
+                StopApplication();
             });
 
             // Assign the context menu to the notify icon
@@ -127,6 +106,71 @@ namespace SFTPSyncUI
             if (enableDisableStartSync() && checkBoxAutoStartSync.Checked)
             {
                 startSync();
+            }
+        }
+        private void mnuFileExit_Click(object sender, EventArgs e)
+        {
+            //The user asked us to close the application
+            StopApplication();
+        }
+
+        private void mnuHelpView_Click(object sender, EventArgs e)
+        {
+            ShowHelp();
+        }
+
+        private void mnuHelpAbout_Click(object sender, EventArgs e)
+        {
+            ShowAbout();
+        }
+
+        private void StopApplication()
+        {
+            //The user asked us to close the application
+
+            if (syncRunning)
+            {
+                if (MessageBox.Show($"Stop sync and close?",
+                    Application.ProductName,
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question,
+                    MessageBoxDefaultButton.Button2) == DialogResult.No)
+                {
+                    return;
+                }
+
+                //Stop the sync process
+                stopSync();
+            }
+
+            //Close the application
+            notifyIcon.Visible = false;
+            Application.Exit();
+        }
+
+        private void ShowAbout()
+        {
+            var dlg = new AboutForm();
+            dlg.ShowDialog();
+        }
+
+        private void ShowHelp()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "hh.exe",
+                    Arguments = $"\"{helpFilePath}\"",
+                    UseShellExecute = false
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Unable to open help file. {ex.Message}",
+                    Application.ProductName,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -456,6 +500,18 @@ namespace SFTPSyncUI
                 }
             }
 
+        }
+
+        public void SetStatusBarText(string text)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => StatusBar.Items[0].Text = text));
+            }
+            else
+            {
+                StatusBar.Items[0].Text = text;
+            }
         }
     }
 }

@@ -12,6 +12,8 @@ namespace SFTPSyncUI
 
         public static AppSettings? Settings { get; private set; }
 
+        private static MainForm? mainForm;
+
         private const string autoRunRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string pipeName = "SFTPSyncUIPipe";
 
@@ -84,7 +86,7 @@ namespace SFTPSyncUI
             // Run the main form (it will start hidden, but put an icon in the system tray)
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+            Application.Run(mainForm = new MainForm());
         }
 
         /// <summary>
@@ -117,17 +119,18 @@ namespace SFTPSyncUI
         /// </summary>
         private static void ShowMainWindow()
         {
+            if (mainForm == null)
+                return;
+
             // Needs to be run on UI thread
-            Application.OpenForms[0]?.BeginInvoke((Action)(() =>
+            mainForm.BeginInvoke((Action)(() =>
             {
-                var form = Application.OpenForms[0];
+                if (mainForm.WindowState == FormWindowState.Minimized)
+                    mainForm.WindowState = FormWindowState.Normal;
 
-                if (form?.WindowState == FormWindowState.Minimized)
-                    form.WindowState = FormWindowState.Normal;
-
-                form?.Show();
-                form?.BringToFront();
-                form?.Activate();
+                mainForm.Show();
+                mainForm.BringToFront();
+                mainForm.Activate();
             }));
         }
 
@@ -174,8 +177,12 @@ namespace SFTPSyncUI
             }
         }
 
-        public static List<RemoteSync> remoteSyncs = new List<RemoteSync>();
+        public static List<RemoteSync> RemoteSyncWorkers = new List<RemoteSync>();
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="loggerAction"></param>
         public static async void StartSync(Action<string> loggerAction)
         {
             if (Settings == null)
@@ -183,41 +190,56 @@ namespace SFTPSyncUI
 
             Logger.LogUpdated += loggerAction;
             Logger.LogInfo("Starting sync workers...");
+            mainForm?.SetStatusBarText("Performing initial sync...");
 
             var director = new SyncDirector(Settings.LocalPath);
 
             foreach (var pattern in Settings.LocalSearchPattern.Split(';', StringSplitOptions.RemoveEmptyEntries))
             {
-                if (remoteSyncs.Count > 0)
+                if (RemoteSyncWorkers.Count > 0)
                 {
-                    await remoteSyncs[0].DoneMakingFolders;
+                    //The first sync worker will create all of the remote folders before it starts,
+                    //to sync files matching it's pattern so wait for it to finish before starting
+                    //the remaining sync workers
+                    await RemoteSyncWorkers[0].DoneMakingFolders;
                 }
                 try
                 {
-                    remoteSyncs.Add(new RemoteSync(
+                    RemoteSyncWorkers.Add(new RemoteSync(
                         Settings.RemoteHost, 
                         Settings.RemoteUsername, 
                         DPAPIEncryption.Decrypt(Settings.RemotePassword), 
                         Settings.LocalPath, 
                         Settings.RemotePath, 
                         pattern, 
-                        remoteSyncs.Count == 0, 
+                        RemoteSyncWorkers.Count == 0, 
                         director));
 
-                    Logger.LogInfo($"Started sync worker {remoteSyncs.Count} for pattern {pattern}");
+                    Logger.LogInfo($"Started sync worker {RemoteSyncWorkers.Count} for pattern {pattern}");
                 }
                 catch (Exception)
                 {
                     Logger.LogError($"Failed to start sync worder for pattern {pattern}");
                 }
             }
+
+            //Wait for all sync workers to finish initial sync then tell the user
+            await Task.WhenAll(RemoteSyncWorkers.Select(rsw => rsw.DoneInitialSync));
+
+            Logger.LogInfo("Initial sync complete, real-time sync now active");
+            mainForm?.SetStatusBarText("Real time sync active");
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="loggerAction"></param>
         public static void StopSync(Action<string> loggerAction)
         {
-            Logger.LogInfo($"Stopping {remoteSyncs.Count} sync workers...");
+            Logger.LogInfo("Stopping sync workers...");
+            mainForm?.SetStatusBarText("Stopping sync worders...");
 
-            foreach (var remoteSync in remoteSyncs)
+            foreach (var remoteSync in RemoteSyncWorkers)
             {
                 try
                 {
@@ -226,9 +248,12 @@ namespace SFTPSyncUI
                 catch { /* Swallow any exceptions */ }
             }
 
-            remoteSyncs.Clear();
+            RemoteSyncWorkers.Clear();
 
             Logger.LogUpdated -= loggerAction;
+
+            Logger.LogInfo("Sync stopped");
+            mainForm?.SetStatusBarText("Sync stopped");
         }
     }
 }
