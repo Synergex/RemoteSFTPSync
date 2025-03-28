@@ -21,6 +21,7 @@
 
 		<!-- ************************************************************************************************************* -->
 		<!-- Set the icon to be used in "Programs & Features" -->
+
 		<Icon Id="SFTPSyncUIIcon" SourceFile="..\SFTPSyncUI\SFTPSyncUI.ico"/>
 		<Property Id="ARPPRODUCTICON" Value="SFTPSyncUIIcon" />
 
@@ -163,7 +164,7 @@
 		</Component>
 
 		<!-- ************************************************************************************************************* -->
-		<!-- Main SFTPSyncUI product feature -->
+		<!-- Main product feature -->
 
 		<Feature
 			Id="SFTPSyncUIFeature"

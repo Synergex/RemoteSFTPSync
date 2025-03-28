@@ -40,7 +40,8 @@ namespace SFTPSyncLib
 
         public static void SyncFile(SftpClient sftp, string sourcePath, string destinationPath)
         {
-            sftp.WriteAllText(sourcePath, destinationPath);
+            Logger.LogInfo($"Syncing {sourcePath} -> {destinationPath}");
+            sftp.WriteAllText(destinationPath, File.ReadAllText(sourcePath));
         }
 
         public static Task<IEnumerable<FileInfo>> SyncDirectoryAsync(SftpClient sftp, string sourcePath, string destinationPath, string searchPattern)
@@ -72,9 +73,12 @@ namespace SFTPSyncLib
 
         public async Task CreateDirectories(string localPath, string remotePath)
         {
+            Logger.LogInfo($"Creating directory {localPath} -> {remotePath}");
+
             try
             {
                 var localDirectories = FilteredDirectories(localPath);
+
                 var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
                 {
                     if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
@@ -82,6 +86,7 @@ namespace SFTPSyncLib
                     else
                         return item.Name;
                 });
+
                 foreach (var item in localDirectories)
                 {
                     var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
@@ -104,6 +109,7 @@ namespace SFTPSyncLib
         {
             await DoneMakingFolders;
             var localDirectories = FilteredDirectories(localPath);
+
             var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
             {
                 if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
@@ -111,6 +117,7 @@ namespace SFTPSyncLib
                 else
                     return item.Name;
             });
+
             foreach (var item in localDirectories)
             {
                 var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
@@ -206,7 +213,7 @@ namespace SFTPSyncLib
                     else
                         _activeDirSync.Add(arg.FullPath);
                 }
-                SyncFile(_sftp, arg.FullPath, arg.FullPath.Substring(_localRootDirectory.Length).Replace('\\', '/'));
+                SyncFile(_sftp, arg.FullPath, fullRemotePath + "/" + Path.GetFileName(arg.FullPath)   );
 
                 lock (_activeDirSync)
                 {

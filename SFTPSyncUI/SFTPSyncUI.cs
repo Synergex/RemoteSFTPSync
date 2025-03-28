@@ -182,7 +182,7 @@ namespace SFTPSyncUI
                 return;
 
             Logger.LogUpdated += loggerAction;
-            Logger.LogInfo("Starting sync...");
+            Logger.LogInfo("Starting sync workers...");
 
             var director = new SyncDirector(Settings.LocalPath);
 
@@ -194,18 +194,29 @@ namespace SFTPSyncUI
                 }
                 try
                 {
-                    remoteSyncs.Add(new RemoteSync(Settings.RemoteHost, Settings.RemoteUsername, DPAPIEncryption.Decrypt(Settings.RemotePassword), Settings.LocalPath, Settings.RemotePath, pattern, remoteSyncs.Count == 0, director));
-                    Logger.LogInfo($"Started sync for pattern {pattern}");
+                    remoteSyncs.Add(new RemoteSync(
+                        Settings.RemoteHost, 
+                        Settings.RemoteUsername, 
+                        DPAPIEncryption.Decrypt(Settings.RemotePassword), 
+                        Settings.LocalPath, 
+                        Settings.RemotePath, 
+                        pattern, 
+                        remoteSyncs.Count == 0, 
+                        director));
+
+                    Logger.LogInfo($"Started sync worker {remoteSyncs.Count} for pattern {pattern}");
                 }
                 catch (Exception)
                 {
-                    Logger.LogError($"Failed to start sync for pattern {pattern}");
+                    Logger.LogError($"Failed to start sync worder for pattern {pattern}");
                 }
             }
         }
 
         public static void StopSync(Action<string> loggerAction)
         {
+            Logger.LogInfo($"Stopping {remoteSyncs.Count} sync workers...");
+
             foreach (var remoteSync in remoteSyncs)
             {
                 try
@@ -217,7 +228,6 @@ namespace SFTPSyncUI
 
             remoteSyncs.Clear();
 
-            Logger.LogInfo("Stopping sync...");
             Logger.LogUpdated -= loggerAction;
         }
     }
