@@ -32,7 +32,7 @@ namespace SFTPSync
                 //Wait for all sync workers to finish initial sync then tell the user
                 await Task.WhenAll(remoteSyncWorkers.Select(rsw => rsw.DoneInitialSync));
 
-                Logger.LogInfo("Initial sync complete, real-time sync now active");
+                Logger.LogInfo("Initial sync complete, real-time sync active");
 
                 Console.Write("Press Ctrl+C to exit: ");
 

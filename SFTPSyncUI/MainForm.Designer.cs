@@ -344,8 +344,10 @@ namespace SFTPSyncUI
             // Panel1
             // 
             Panel1.AutoSize = false;
+            Panel1.ImageAlign = ContentAlignment.MiddleLeft;
             Panel1.Name = "Panel1";
             Panel1.Size = new Size(1200, 18);
+            Panel1.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // MainForm
             // 

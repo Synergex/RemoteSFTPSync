@@ -226,7 +226,7 @@ namespace SFTPSyncUI
             //Wait for all sync workers to finish initial sync then tell the user
             await Task.WhenAll(RemoteSyncWorkers.Select(rsw => rsw.DoneInitialSync));
 
-            Logger.LogInfo("Initial sync complete, real-time sync now active");
+            Logger.LogInfo("Initial sync complete, real-time sync active");
             mainForm?.SetStatusBarText("Real time sync active");
         }
 
@@ -236,8 +236,8 @@ namespace SFTPSyncUI
         /// <param name="loggerAction"></param>
         public static void StopSync(Action<string> loggerAction)
         {
-            Logger.LogInfo("Stopping sync workers...");
-            mainForm?.SetStatusBarText("Stopping sync worders...");
+            Logger.LogInfo("Stopping sync...");
+            mainForm?.SetStatusBarText("Stopping sync...");
 
             foreach (var remoteSync in RemoteSyncWorkers)
             {
