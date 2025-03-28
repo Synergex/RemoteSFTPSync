@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+	<Product
+		Id="*"
+		Name="SFTPSync"
+		Language="1033"
+		Version="1.0"
+		Manufacturer="Synergex International Corporation"
+		UpgradeCode="6000f870-b811-4e22-b80b-5b8956317d09">
+
+		<Package
+			InstallerVersion="500"
+			Compressed="yes"
+			InstallScope="perMachine"
+			Platform="x64"/>
+
+		<MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+		<MediaTemplate EmbedCab="yes" />
+
+		<!-- ************************************************************************************************************* -->
+		<!-- Set the icon to be used in "Programs & Features" -->
+
+		<Icon Id="SFTPSyncUIIcon" SourceFile="..\SFTPSyncUI\SFTPSyncUI.ico"/>
+		<Property Id="ARPPRODUCTICON" Value="SFTPSyncUIIcon" />
+
+		<!-- ************************************************************************************************************* -->
+		<!-- Select our custom UI (based on WixUI_FeatureTree, with an additonal dialog added) -->
+
+		<UIRef Id="WixUI_Mondo"/>
+		<WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+
+		<!-- ************************************************************************************************************* -->
+		<!-- Directory structure -->
+
+		<Directory Id="TARGETDIR" Name="SourceDir">
+			<Directory Id="ProgramFiles64Folder">
+				<Directory Id="SYNERGEXFOLDER" Name="Synergex">
+					<Directory Id="INSTALLFOLDER" Name="SFTPSync" />
+				</Directory>
+			</Directory>
+			<Directory Id="ProgramMenuFolder">
+				<Directory Id="SFTPSyncProgramMenuFolder" Name="SFTP Sync" />
+			</Directory>
+		</Directory>
+
+		<!-- ************************************************************************************************************* -->
+		<!-- ComponentGroup and components -->
+
+		<DirectoryRef Id="INSTALLFOLDER">
+
+			<!-- SFTPSyncUI Application -->
+
+			<Component Id="SFTPSyncChm" Guid="*" Win64="yes">
+				<File Id="SFTPSyncChm" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\docs\SFTPSync.chm" KeyPath="yes" />
+			</Component>
+
+			<Component Id="AppSettingsJson" Guid="*" Win64="yes">
+				<File Id="AppSettingsJson" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\appsettings.json" KeyPath="yes" />
+			</Component>
+
+			<Component Id="D3DCompiler47cor3Dll" Guid="*" Win64="yes">
+				<File Id="D3DCompiler47cor3Dll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\D3DCompiler_47_cor3.dll" KeyPath="yes" />
+			</Component>
+
+			<Component Id="PenImcCor3Dll" Guid="*" Win64="yes">
+				<File Id="PenImcCor3Dll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\PenImc_cor3.dll" KeyPath="yes" />
+			</Component>
+
+			<Component Id="PresentationNativeCor3Dll" Guid="*" Win64="yes">
+				<File Id="PresentationNativeCor3Dll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\PresentationNative_cor3.dll" KeyPath="yes" />
+			</Component>
+
+			<Component Id="RenciSshNetPdb" Guid="*" Win64="yes">
+				<File Id="RenciSshNetPdb" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\Renci.SshNet.pdb" KeyPath="yes" />
+			</Component>
+
+			<Component Id="RenciSshNetXml" Guid="*" Win64="yes">
+				<File Id="RenciSshNetXml" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\Renci.SshNet.xml" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncLibPdb" Guid="*" Win64="yes">
+				<File Id="SFTPSyncLibPdb" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncLib.pdb" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncUiExe" Guid="*" Win64="yes">
+				<File Id="SFTPSyncUiExe" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.exe" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncUiIco" Guid="*" Win64="yes">
+				<File Id="SFTPSyncUiIco" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.ico" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncUiPdb" Guid="*" Win64="yes">
+				<File Id="SFTPSyncUiPdb" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncUI.pdb" KeyPath="yes" />
+			</Component>
+
+			<Component Id="VCRuntime140Cor3Dll" Guid="*" Win64="yes">
+				<File Id="VCRuntime140Cor3Dll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\vcruntime140_cor3.dll" />
+			</Component>
+
+			<Component Id="WpfGfxCor3Dll" Guid="*" Win64="yes">
+				<File Id="WpfGfxCor3Dll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64\wpfgfx_cor3.dll" />
+			</Component>
+
+			<!-- SFTPSync Application -->
+
+			<Component Id="SFTPSyncExe" Guid="*" Win64="yes">
+				<File Id="SFTPSyncExe" Source="..\SFTPSync\bin\Release\net8.0-windows\publish\win-x64\SFTPSync.exe" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncPdb" Guid="*" Win64="yes">
+				<File Id="SFTPSyncPdb" Source="..\SFTPSync\bin\Release\net8.0-windows\publish\win-x64\SFTPSync.pdb" KeyPath="yes" />
+			</Component>
+
+			<!-- SFTPSyncStop application -->
+
+			<Component Id="SFTPSyncStopExe" Guid="*" Win64="yes">
+				<File Id="SFTPSyncStopExe" Source="..\SFTPSyncStop\bin\Release\net8.0-windows\publish\win-x64\SFTPSyncStop.exe" />
+			</Component>
+
+			<!-- Other files -->
+
+			<Component Id="LicenseRtf" Guid="*" Win64="yes">
+				<File Id="LicenseRtf" Source="..\SFTPSyncSetup\license.rtf" />
+			</Component>
+
+		</DirectoryRef>
+
+		<!-- Shortcuts -->
+
+		<Component Id="Shortcut" Guid="*" Directory="SFTPSyncProgramMenuFolder">
+
+			<Shortcut
+				Id="SFTPSyncShortcut"
+				Name="SFTP Sync"
+				Description="Open SFTP Sync"
+				Target="[INSTALLFOLDER]SFTPSyncUI.exe"
+				WorkingDirectory="INSTALLFOLDER" />
+
+			<!-- Ensure directory removal on uninstall -->
+			<RemoveFolder
+				Id="RemoveSFTPSyncProgramMenuFolder"
+				Directory="SFTPSyncProgramMenuFolder"
+				On="uninstall"/>
+
+			<!-- Registry key to avoid ICE43 error -->
+			<RegistryValue
+				Root="HKCU"
+				Key="Software\SFTPSync"
+				Name="Installed"
+				Type="integer"
+				Value="1"
+				KeyPath="yes" />
+
+			<!-- Remove shortcut on uninstall -->
+			<RemoveFile
+				Id="RemoveSFTPSyncShortcut"
+				Name="SFTP Sync.lnk"
+				Directory="SFTPSyncProgramMenuFolder"
+				On="uninstall"/>
+
+		</Component>
+
+		<!-- ************************************************************************************************************* -->
+		<!-- Main product feature -->
+
+		<Feature
+			Id="SFTPSyncUIFeature"
+			Title="Desktop application"
+			Description="This required feature provides the SFTP Sync desktop application."
+			Level="1"
+			Absent="disallow">
+
+			<!-- Published files -->
+			<ComponentRef Id="AppSettingsJson" />
+			<ComponentRef Id="D3DCompiler47cor3Dll" />
+			<ComponentRef Id="PenImcCor3Dll" />
+			<ComponentRef Id="PresentationNativeCor3Dll" />
+			<ComponentRef Id="RenciSshNetPdb" />
+			<ComponentRef Id="RenciSshNetXml" />
+			<ComponentRef Id="SFTPSyncLibPdb" />
+			<ComponentRef Id="SFTPSyncUiExe" />
+			<ComponentRef Id="SFTPSyncUiIco" />
+			<ComponentRef Id="SFTPSyncUiPdb" />
+			<ComponentRef Id="VCRuntime140Cor3Dll" />
+			<ComponentRef Id="WpfGfxCor3Dll" />
+
+			<!-- Other files -->
+			<ComponentRef Id="LicenseRtf" />
+
+			<!-- Stop utility -->
+			<ComponentRef Id="SFTPSyncStopExe" />
+
+			<!-- Shortcuts -->
+			<ComponentRef Id="Shortcut"/>
+
+		</Feature>
+
+		<!-- ************************************************************************************************************* -->
+		<!-- Command-line SFTPSync product feature -->
+
+		<Feature
+			Id="SFTPSyncFeature"
+			Title="Command-line application"
+			Description="This optional feature provides the SFTP Sync command line application."
+			Level="1"
+			Absent="allow">
+
+			<!-- Published files -->
+			<ComponentRef Id="SFTPSyncExe" />
+			<ComponentRef Id="SFTPSyncPdb" />
+
+		</Feature>
+
+		<!-- ************************************************************************************************************* -->
+		<!-- Command-line SFTPSync product feature -->
+
+		<Feature
+			Id="DocumentationFeature"
+			Title="Documentation"
+			Description="This optional feature provides the SFTP Sync documentation."
+			Level="1"
+			Absent="allow">
+
+			<!-- Documentation files -->
+			<ComponentRef Id="SFTPSyncChm" />
+
+		</Feature>
+
+		<!-- ************************************************************************************************************* -->
+		<!-- Custom action to try to stop the application(s) before uninstall -->
+
+		<CustomAction
+			Id="StopAppCustomAction"
+			FileKey="SFTPSyncStopExe"
+			ExeCommand=""
+			Execute="deferred"
+			Return="ignore"
+			Impersonate="no" />
+
+		<!-- Schedule it before RemoveFiles -->
+		<InstallExecuteSequence>
+			<Custom Action="StopAppCustomAction" Before="RemoveFiles">
+				REMOVE="ALL"
+			</Custom>
+		</InstallExecuteSequence>
+
+	</Product>
+</Wix>
