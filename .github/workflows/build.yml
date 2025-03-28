@@ -3,7 +3,7 @@ name: Build and Package .NET 8 Solution
 on:
   push:
     branches:
-      - WindowsService
+      - master
   pull_request:
 
 jobs:
