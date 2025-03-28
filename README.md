@@ -15,11 +15,11 @@ changes in real time, and replicates those changes in the remote system.
 Two versions of the application are available, one with a Windows user
 interface, and one used from the Windows command line.
 
-* [Important Usage Informnation](important-usage-information)
-* [Downloading and Installing](downloading-and-installing)
-* [Windows Desktop Application](windows-desktop-application)
-* [Windows Command-Line Application](windows-command-line-application)
-* [Uninstalling](uninstalling)
+* [Important Usage Informnation](#important-usage-information)
+* [Downloading and Installing](#downloading-and-installing)
+* [Windows Desktop Application](#windows-desktop-application)
+* [Windows Command-Line Application](#windows-command-line-application)
+* [Uninstalling](#uninstalling)
 
 ---
 
