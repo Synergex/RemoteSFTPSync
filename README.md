@@ -15,6 +15,12 @@ changes in real time, and replicates those changes in the remote system.
 Two versions of the application are available, one with a Windows user
 interface, and one used from the Windows command line.
 
+* [Important Usage Informnation](important-usage-information)
+* [Downloading and Installing](downloading-and-installing)
+* [Windows Desktop Application](windows-desktop-application)
+* [Windows Command-Line Application](windows-command-line-application)
+* [Uninstalling](uninstalling)
+
 ---
 
 ## Important Usage Information
@@ -70,34 +76,34 @@ on your system.
 
 When you start the installation this is what you will see:
 
-![Installer screen 1](SFTPSyncUI/docs/SFTPSYNC_files/Image(1).png)
+![Installer screen 1](SFTPSyncUI/docs/SFTPSync_files/Image(1).png)
 
 Click the Next button to continue, and you will see this:
 
-![Installer screen 2](SFTPSyncUI/docs/SFTPSYNC_files/Image(2).png)
+![Installer screen 2](SFTPSyncUI/docs/SFTPSync_files/Image(2).png)
 
 Click the check-box to accept the open-source license agreement, 
 then click the Next button. You will see this:
 
-![Installer screen 3](SFTPSyncUI/docs/SFTPSYNC_files/Image(3).png)
+![Installer screen 3](SFTPSyncUI/docs/SFTPSync_files/Image(3).png)
 
 Most users should click the Complete button, but if you prefer not 
 to install the command-line program or the documentation, then you 
 can click the Custom button and de-select those options. After 
 clicking the Complete button you will see this:
 
-![Installer screen 4](SFTPSyncUI/docs/SFTPSYNC_files/Image(4).png)
+![Installer screen 4](SFTPSyncUI/docs/SFTPSync_files/Image(4).png)
 
 Click the Install button to begin the installation. Having done so
 you will see a User Account Control (UAC) prompt, and you should click
 on the Yes button to confirm that you wish to install the product. You 
 will then see a progress dialog as the installation proceeds:
 
-![Installer screen 5](SFTPSyncUI/docs/SFTPSYNC_files/Image(5).png)
+![Installer screen 5](SFTPSyncUI/docs/SFTPSync_files/Image(5).png)
 
 And when the installation completes you will see this:
 
-![Installer screen 6](SFTPSyncUI/docs/SFTPSYNC_files/Image(6).png)
+![Installer screen 6](SFTPSyncUI/docs/SFTPSync_files/Image(6).png)
 
 Click the Finish button to complete the installation.
 
@@ -109,7 +115,7 @@ The Windows UI application is provided via a program called
 SFTPSyncUI.exe which you can open via a Start Menu icon. When 
 you start the application for the first time you sill see this:
 
-![Installer screen 1](SFTPSyncUI/docs/SFTPSYNC_files/Image(8).png)
+![Installer screen 1](SFTPSyncUI/docs/SFTPSync_files/Image(8).png)
 
 You must provide information about the local root directory that 
 contains the files that you want to replicate, as well as a search 
