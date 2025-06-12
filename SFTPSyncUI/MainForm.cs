@@ -380,7 +380,7 @@ namespace SFTPSyncUI
                 allOk = false;
 
             //Remote password validation (just has to be non-null)
-            if (allOk && String.IsNullOrWhiteSpace(DPAPIEncryption.Decrypt(textBoxRemotePassword.Text)))
+            if (allOk && String.IsNullOrWhiteSpace(textBoxRemotePassword.Text))
                 allOk = false;
 
             buttonStartStopSync.Enabled = allOk;
