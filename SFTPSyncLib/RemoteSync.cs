@@ -12,6 +12,8 @@ namespace SFTPSyncLib
         string _searchPattern;
         string _localRootDirectory;
         string _remoteRootDirectory;
+        readonly List<string> _excludedFolders;
+
         SftpClient _sftp;
         SyncDirector _director;
         HashSet<string> _activeDirSync = new HashSet<string>();
@@ -19,7 +21,9 @@ namespace SFTPSyncLib
         public Task DoneMakingFolders { get; }
         public Task DoneInitialSync { get; }
 
-        public RemoteSync(string host, string username, string password, string localRootDirectory, string remoteRootDirectory, string searchPattern, bool createFolders, SyncDirector director)
+        public RemoteSync(string host, string username, string password,
+            string localRootDirectory, string remoteRootDirectory, 
+            string searchPattern, bool createFolders, SyncDirector director, List<string> excludedFolders)
         {
             _host = host;
             _username = username;
@@ -28,6 +32,7 @@ namespace SFTPSyncLib
             _localRootDirectory = localRootDirectory;
             _remoteRootDirectory = remoteRootDirectory;
             _director = director;
+            _excludedFolders = excludedFolders;
             _sftp = new SftpClient(host, username, password);
             _sftp.Connect();
 
@@ -65,13 +70,30 @@ namespace SFTPSyncLib
 
         private string[] FilteredDirectories(string localPath)
         {
-            return Directory.GetDirectories(localPath).Where(
-                path =>
+            return Directory.GetDirectories(localPath).Where(path =>
+            {
+                var relativePath = path.Substring(_localRootDirectory.Length);
+
+                // Existing exclusions
+                bool isExcluded = relativePath.EndsWith(".git")
+                                  || relativePath.EndsWith(".vs")
+                                  || relativePath.EndsWith("bin")
+                                  || relativePath.EndsWith("obj")
+                                  || relativePath.Contains(".");
+
+                // Check _excludedFolders
+                if (!isExcluded && _excludedFolders != null && _excludedFolders.Count > 0)
                 {
-                    var relativePath = path.Substring(_localRootDirectory.Length);
-                    return !relativePath.Contains(".git") && !relativePath.EndsWith("obj") &&
-                    !relativePath.EndsWith("bin") && !relativePath.Contains(".");
-                }).ToArray();
+                    string fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
+                    isExcluded = _excludedFolders.Any(excluded =>
+                    {
+                        var excludedFullPath = Path.GetFullPath(excluded).TrimEnd(Path.DirectorySeparatorChar);
+                        return string.Equals(fullPath, excludedFullPath, StringComparison.OrdinalIgnoreCase);
+                    });
+                }
+
+                return !isExcluded;
+            }).ToArray();
         }
 
         public async Task CreateDirectories(string localPath, string remotePath)

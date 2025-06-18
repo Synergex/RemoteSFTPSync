@@ -76,34 +76,34 @@ on your system.
 
 When you start the installation this is what you will see:
 
-![Installer screen 1](SFTPSyncUI/docs/SFTPSync_files/Image(1).png)
+![Installer screen 1](SFTPSyncUI/docs/SFTPSync_files/InstallerScreen1.png)
 
 Click the Next button to continue, and you will see this:
 
-![Installer screen 2](SFTPSyncUI/docs/SFTPSync_files/Image(2).png)
+![Installer screen 2](SFTPSyncUI/docs/SFTPSync_files/InstallerScreen2.png)
 
 Click the check-box to accept the open-source license agreement, 
 then click the Next button. You will see this:
 
-![Installer screen 3](SFTPSyncUI/docs/SFTPSync_files/Image(3).png)
+![Installer screen 3](SFTPSyncUI/docs/SFTPSync_files/InstallerScreen3.png)
 
 Most users should click the Complete button, but if you prefer not 
 to install the command-line program or the documentation, then you 
 can click the Custom button and de-select those options. After 
 clicking the Complete button you will see this:
 
-![Installer screen 4](SFTPSyncUI/docs/SFTPSync_files/Image(4).png)
+![Installer screen 4](SFTPSyncUI/docs/SFTPSync_files/InstallerScreen4.png)
 
 Click the Install button to begin the installation. Having done so
 you will see a User Account Control (UAC) prompt, and you should click
 on the Yes button to confirm that you wish to install the product. You 
 will then see a progress dialog as the installation proceeds:
 
-![Installer screen 5](SFTPSyncUI/docs/SFTPSync_files/Image(5).png)
+![Installer screen 5](SFTPSyncUI/docs/SFTPSync_files/InstallerScreen5.png)
 
 And when the installation completes you will see this:
 
-![Installer screen 6](SFTPSyncUI/docs/SFTPSync_files/Image(6).png)
+![Installer screen 6](SFTPSyncUI/docs/SFTPSync_files/InstallerScreen6.png)
 
 Click the Finish button to complete the installation.
 
@@ -115,7 +115,7 @@ The Windows UI application is provided via a program called
 SFTPSyncUI.exe which you can open via a Start Menu icon. When 
 you start the application for the first time you sill see this:
 
-![Installer screen 1](SFTPSyncUI/docs/SFTPSync_files/Image(8).png)
+![Main Window](SFTPSyncUI/docs/SFTPSync_files/MainWindowScreenShot.png)
 
 You must provide information about the local root directory that 
 contains the files that you want to replicate, as well as a search 
@@ -151,6 +151,25 @@ your search spec would look like this:
 *.DBL;*.DEF;*.INC
 ```
 
+### Remote path
+
+The remote path field is used to specify a path on the remote 
+OpenVMS system that represents the root directory for the 
+replicated files. The path must be expressed in Unix format, 
+and to some extent depends on the configuration of your system. 
+In many cases an OpenVMS path like DKA0:[MYUSER.DEVFILES.MYPROJECT] 
+will be specified like this:
+
+```
+/DISK$DKA0/MYUSER/DEVFILES/MYPROJECT/
+```
+
+But your system may require something different. To determine the 
+value of the remote path we recommend using an application such as 
+WinSCP or FileZilla to make an SFTP connection to the system and 
+user account, and then determine the path based on what you see in 
+that application.
+
 ### Remote host
 
 In this field you should enter the DNS name or TCP/IP address of 
@@ -177,54 +196,6 @@ OpenVMS user account to be used to log in to the remote system.
 Note that OpenVMS passwords are not usually case sensitive, but 
 in some cases can be.
 
-The value entered into the password field is normally hidden, but 
-can be revealed by checking the Show password option.
-
-As with the other configuration details, the password is stored in 
-the applications configuration file, but in an encrypted form. The 
-encryption used keys provided by the Windows operating system that 
-are associated with the current Windows user account, and so can 
-only be decrypted when logged into the same account.
-
-### Remote path
-
-The remote path field is used to specify a path on the remote 
-OpenVMS system that represents the root directory for the 
-replicated files. The path must be expressed in Unix format, 
-and to some extent depends on the configuration of your system. 
-In many cases an OpenVMS path like DKA0:[MYUSER.DEVFILES.MYPROJECT] 
-will be specified like this:
-
-```
-/DISK$DKA0/MYUSER/DEVFILES/MYPROJECT/
-```
-
-But your system may require something different. To determine the 
-value of the remote path we recommend using an application such as 
-WinSCP or FileZilla to make an SFTP connection to the system and 
-user account, and then determine the path based on what you see in 
-that application.
-
-### Verify Access
-
-The Verify Access button will be enabled whenever the remote 
-credentials (host name, user name or password) change. When 
-enabled, clicking the button will initiate an SFTP connection 
-using the currently defined information, and you will see a message 
-indicating whether the connection was successful. Until a successful 
-connection is made, is is not possible to initiate directory and file 
-synchronization.
-
-### Start Sync
-
-Having successfully verified remote access you have the option to 
-click the Start Sync button, which as its name suggests, starts the 
-process of synchronizing directories and files from the Windows 
-system to the remote OpenVMS system. Note that synchronization 
-occurs in one direction only; changes to directories and files 
-on the Windows system are re-created on the OpenVMS system, but 
-changes on the OpenVMS system are NOT re-created on Windows.
-
 ### Start at login
 
 If the Start at login option is checked then each time you log in 
@@ -246,6 +217,46 @@ synchronizing directories and files with the remote OpenVMS system,
 so long as all of the configuration options are specified and correct. 
 If settings are missing, or remote information has not been validated, 
 then synchronization will not begin automatically.
+
+### Exclusions
+
+Clicking the exclusions button will show the Excluded Directories
+dialog, which you can use to exclude directories and directory trees
+from the sync process, regardless of whether those directories contain
+any files that match the Search Spec file extensions.
+
+![Excluded Directories Dialog](SFTPSyncUI/docs/SFTPSync_files/ExcludedDirectoriesDialog.png)
+
+### Show Password
+
+The value entered into the password field is normally hidden, but 
+can be revealed by checking the Show password option.
+
+As with the other configuration details, the password is stored in 
+the applications configuration file, but in an encrypted form. The 
+encryption used keys provided by the Windows operating system that 
+are associated with the current Windows user account, and so can 
+only be decrypted when logged into the same account.
+
+### Verify Access
+
+The Verify Access button will be enabled whenever the remote 
+credentials (host name, user name or password) change. When 
+enabled, clicking the button will initiate an SFTP connection 
+using the currently defined information, and you will see a message 
+indicating whether the connection was successful. Until a successful 
+connection is made, is is not possible to initiate directory and file 
+synchronization.
+
+### Start Sync
+
+Having successfully verified remote access you have the option to 
+click the Start Sync button, which as its name suggests, starts the 
+process of synchronizing directories and files from the Windows 
+system to the remote OpenVMS system. Note that synchronization 
+occurs in one direction only; changes to directories and files 
+on the Windows system are re-created on the OpenVMS system, but 
+changes on the OpenVMS system are NOT re-created on Windows.
 
 ### Viewing the Application Window
 

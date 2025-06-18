@@ -33,6 +33,7 @@ namespace SFTPSyncUI
             checkStartAtLogin = new CheckBox();
             checkStartInTray = new CheckBox();
             groupBoxSettings = new GroupBox();
+            btnExclusions = new Button();
             buttonVerifyAccess = new Button();
             buttonStartStopSync = new Button();
             checkBoxShowPassword = new CheckBox();
@@ -70,7 +71,7 @@ namespace SFTPSyncUI
             checkStartAtLogin.Location = new Point(109, 130);
             checkStartAtLogin.Name = "checkStartAtLogin";
             checkStartAtLogin.Size = new Size(117, 24);
-            checkStartAtLogin.TabIndex = 7;
+            checkStartAtLogin.TabIndex = 4;
             checkStartAtLogin.Text = "Start at &login";
             checkStartAtLogin.UseVisualStyleBackColor = true;
             checkStartAtLogin.CheckedChanged += checkStartAtLogin_CheckedChanged;
@@ -81,13 +82,14 @@ namespace SFTPSyncUI
             checkStartInTray.Location = new Point(232, 130);
             checkStartInTray.Name = "checkStartInTray";
             checkStartInTray.Size = new Size(156, 24);
-            checkStartInTray.TabIndex = 8;
+            checkStartInTray.TabIndex = 5;
             checkStartInTray.Text = "Start in system &tray";
             checkStartInTray.UseVisualStyleBackColor = true;
             checkStartInTray.CheckedChanged += checkStartInTray_CheckedChanged;
             // 
             // groupBoxSettings
             // 
+            groupBoxSettings.Controls.Add(btnExclusions);
             groupBoxSettings.Controls.Add(buttonVerifyAccess);
             groupBoxSettings.Controls.Add(buttonStartStopSync);
             groupBoxSettings.Controls.Add(checkBoxShowPassword);
@@ -115,13 +117,23 @@ namespace SFTPSyncUI
             groupBoxSettings.TabStop = false;
             groupBoxSettings.Text = "Settings";
             // 
+            // btnExclusions
+            // 
+            btnExclusions.Location = new Point(532, 128);
+            btnExclusions.Name = "btnExclusions";
+            btnExclusions.Size = new Size(94, 29);
+            btnExclusions.TabIndex = 7;
+            btnExclusions.Text = "&Exclusions";
+            btnExclusions.UseVisualStyleBackColor = true;
+            btnExclusions.Click += btnExclusions_Click;
+            // 
             // buttonVerifyAccess
             // 
             buttonVerifyAccess.Enabled = false;
-            buttonVerifyAccess.Location = new Point(941, 128);
+            buttonVerifyAccess.Location = new Point(962, 128);
             buttonVerifyAccess.Name = "buttonVerifyAccess";
             buttonVerifyAccess.Size = new Size(104, 29);
-            buttonVerifyAccess.TabIndex = 19;
+            buttonVerifyAccess.TabIndex = 12;
             buttonVerifyAccess.Text = "&Verify Access";
             buttonVerifyAccess.UseVisualStyleBackColor = true;
             buttonVerifyAccess.Click += buttonVerifyAccess_Click;
@@ -131,7 +143,7 @@ namespace SFTPSyncUI
             buttonStartStopSync.Location = new Point(1072, 128);
             buttonStartStopSync.Name = "buttonStartStopSync";
             buttonStartStopSync.Size = new Size(94, 29);
-            buttonStartStopSync.TabIndex = 18;
+            buttonStartStopSync.TabIndex = 13;
             buttonStartStopSync.Text = "&Start Sync";
             buttonStartStopSync.UseVisualStyleBackColor = true;
             buttonStartStopSync.Click += buttonStartStopSync_Click;
@@ -139,10 +151,10 @@ namespace SFTPSyncUI
             // checkBoxShowPassword
             // 
             checkBoxShowPassword.AutoSize = true;
-            checkBoxShowPassword.Location = new Point(801, 130);
+            checkBoxShowPassword.Location = new Point(822, 130);
             checkBoxShowPassword.Name = "checkBoxShowPassword";
             checkBoxShowPassword.Size = new Size(134, 24);
-            checkBoxShowPassword.TabIndex = 17;
+            checkBoxShowPassword.TabIndex = 11;
             checkBoxShowPassword.Text = "Show &password";
             checkBoxShowPassword.UseVisualStyleBackColor = true;
             checkBoxShowPassword.CheckedChanged += checkBoxShowPassword_CheckedChanged;
@@ -153,7 +165,7 @@ namespace SFTPSyncUI
             checkBoxAutoStartSync.Location = new Point(394, 130);
             checkBoxAutoStartSync.Name = "checkBoxAutoStartSync";
             checkBoxAutoStartSync.Size = new Size(128, 24);
-            checkBoxAutoStartSync.TabIndex = 16;
+            checkBoxAutoStartSync.TabIndex = 6;
             checkBoxAutoStartSync.Text = "&Auto start sync";
             checkBoxAutoStartSync.UseVisualStyleBackColor = true;
             checkBoxAutoStartSync.CheckedChanged += checkBoxAutoStartSync_CheckedChanged;
@@ -180,7 +192,7 @@ namespace SFTPSyncUI
             textBoxRemotePassword.Location = new Point(801, 93);
             textBoxRemotePassword.Name = "textBoxRemotePassword";
             textBoxRemotePassword.Size = new Size(365, 27);
-            textBoxRemotePassword.TabIndex = 6;
+            textBoxRemotePassword.TabIndex = 10;
             textBoxRemotePassword.UseSystemPasswordChar = true;
             textBoxRemotePassword.TextChanged += textBoxRemotePassword_TextChanged;
             // 
@@ -198,7 +210,7 @@ namespace SFTPSyncUI
             textBoxRemoteUser.Location = new Point(801, 60);
             textBoxRemoteUser.Name = "textBoxRemoteUser";
             textBoxRemoteUser.Size = new Size(365, 27);
-            textBoxRemoteUser.TabIndex = 5;
+            textBoxRemoteUser.TabIndex = 9;
             textBoxRemoteUser.TextChanged += textBoxRemoteUser_TextChanged;
             // 
             // labelRemoteUser
@@ -215,7 +227,7 @@ namespace SFTPSyncUI
             textBoxRemoteHost.Location = new Point(801, 27);
             textBoxRemoteHost.Name = "textBoxRemoteHost";
             textBoxRemoteHost.Size = new Size(365, 27);
-            textBoxRemoteHost.TabIndex = 4;
+            textBoxRemoteHost.TabIndex = 8;
             textBoxRemoteHost.TextChanged += textBoxRemoteHost_TextChanged;
             // 
             // labelRemoteHost
@@ -282,7 +294,7 @@ namespace SFTPSyncUI
             listBoxMessages.ScrollAlwaysVisible = true;
             listBoxMessages.SelectionMode = SelectionMode.None;
             listBoxMessages.Size = new Size(1182, 560);
-            listBoxMessages.TabIndex = 0;
+            listBoxMessages.TabIndex = 14;
             // 
             // menuStrip1
             // 
@@ -305,7 +317,7 @@ namespace SFTPSyncUI
             // 
             mnuFileExit.Name = "mnuFileExit";
             mnuFileExit.ShortcutKeys = Keys.Alt | Keys.F4;
-            mnuFileExit.Size = new Size(169, 26);
+            mnuFileExit.Size = new Size(224, 26);
             mnuFileExit.Text = "E&xit";
             mnuFileExit.Click += mnuFileExit_Click;
             // 
@@ -321,14 +333,14 @@ namespace SFTPSyncUI
             mnuHelpView.Enabled = false;
             mnuHelpView.Name = "mnuHelpView";
             mnuHelpView.ShortcutKeys = Keys.F1;
-            mnuHelpView.Size = new Size(184, 26);
+            mnuHelpView.Size = new Size(224, 26);
             mnuHelpView.Text = "&View Help";
             mnuHelpView.Click += mnuHelpView_Click;
             // 
             // mnuHelpAbout
             // 
             mnuHelpAbout.Name = "mnuHelpAbout";
-            mnuHelpAbout.Size = new Size(184, 26);
+            mnuHelpAbout.Size = new Size(224, 26);
             mnuHelpAbout.Text = "&About";
             mnuHelpAbout.Click += mnuHelpAbout_Click;
             // 
@@ -406,5 +418,6 @@ namespace SFTPSyncUI
         private ToolStripMenuItem mnuHelpView;
         private ToolStripMenuItem mnuFileExit;
         private ToolStripMenuItem mnuHelpAbout;
+        private Button btnExclusions;
     }
 }

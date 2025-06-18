@@ -1,4 +1,4 @@
-name: Build and Package .NET 8 Solution
+name: Build and Package SFTPSync
 
 on:
   push:

@@ -213,13 +213,14 @@ namespace SFTPSyncUI
                         Settings.RemotePath, 
                         pattern, 
                         RemoteSyncWorkers.Count == 0, 
-                        director));
+                        director,
+                        Settings.ExcludedDirectories));
 
                     Logger.LogInfo($"Started sync worker {RemoteSyncWorkers.Count} for pattern {pattern}");
                 }
                 catch (Exception)
                 {
-                    Logger.LogError($"Failed to start sync worder for pattern {pattern}");
+                    Logger.LogError($"Failed to start sync worker for pattern {pattern}");
                 }
             }
 

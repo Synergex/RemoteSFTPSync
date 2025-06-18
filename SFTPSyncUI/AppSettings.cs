@@ -274,5 +274,26 @@ namespace SFTPSyncUI
                 }
             }
         }
+
+        //Excluded directories
+
+        private List<string> excludedDirectories = new List<string>();
+
+        public List<string> ExcludedDirectories
+        {
+            get => excludedDirectories;
+            set
+            {
+                if (excludedDirectories != value)
+                {
+                    excludedDirectories = value;
+                    if (!initialLoadSettings)
+                    {
+                        SaveToFile();
+                    }
+                }
+            }
+        }
+
     }
 }

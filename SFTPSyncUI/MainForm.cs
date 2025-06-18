@@ -437,9 +437,12 @@ namespace SFTPSyncUI
             buttonLocalPath.Enabled = !syncRunning;
             textBoxSearchSpec.Enabled = !syncRunning;
             textBoxRemotePath.Enabled = !syncRunning;
+            btnExclusions.Enabled = !syncRunning;
             textBoxRemoteHost.Enabled = !syncRunning;
             textBoxRemoteUser.Enabled = !syncRunning;
             textBoxRemotePassword.Enabled = !syncRunning;
+            checkBoxShowPassword.Enabled = !syncRunning;
+            buttonVerifyAccess.Enabled = !syncRunning;
 
             buttonStartStopSync.Text = syncRunning ? "&Stop Sync" : "&Start Sync";
         }
@@ -512,6 +515,21 @@ namespace SFTPSyncUI
             {
                 StatusBar.Items[0].Text = text;
             }
+        }
+
+        private void btnExclusions_Click(object sender, EventArgs e)
+        {
+            var dialog = new ExclusionsForm();
+
+            //Load exclusions from the settings file
+            if (SFTPSyncUI.Settings != null)
+                dialog.ExcludedDirectories = SFTPSyncUI.Settings.ExcludedDirectories;
+
+            dialog.ShowDialog(this);
+
+            //Save exclusions to the settings file
+            if (SFTPSyncUI.Settings != null)
+                SFTPSyncUI.Settings.ExcludedDirectories = dialog.ExcludedDirectories;
         }
     }
 }
