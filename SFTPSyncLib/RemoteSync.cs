@@ -12,7 +12,7 @@ namespace SFTPSyncLib
         string _searchPattern;
         string _localRootDirectory;
         string _remoteRootDirectory;
-        readonly List<string> _excludedFolders;
+        readonly List<string>? _excludedFolders;
 
         SftpClient _sftp;
         SyncDirector _director;
@@ -23,7 +23,7 @@ namespace SFTPSyncLib
 
         public RemoteSync(string host, string username, string password,
             string localRootDirectory, string remoteRootDirectory, 
-            string searchPattern, bool createFolders, SyncDirector director, List<string> excludedFolders)
+            string searchPattern, bool createFolders, SyncDirector director, List<string>? excludedFolders)
         {
             _host = host;
             _username = username;
@@ -32,7 +32,7 @@ namespace SFTPSyncLib
             _localRootDirectory = localRootDirectory;
             _remoteRootDirectory = remoteRootDirectory;
             _director = director;
-            _excludedFolders = excludedFolders;
+            _excludedFolders = excludedFolders ?? new List<string>();
             _sftp = new SftpClient(host, username, password);
             _sftp.Connect();
 
