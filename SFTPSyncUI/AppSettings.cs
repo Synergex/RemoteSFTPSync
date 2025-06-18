@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace SFTPSyncUI
 {
-    internal class AppSettings
+    public class AppSettings
     {
         private static string DefaultSettingsFile = Path.Combine(Path.GetDirectoryName(SFTPSyncUI.ExecutableFile) ?? "", "appsettings.json");
         private static string SettingsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "SFTPSync.json");
@@ -48,6 +48,43 @@ namespace SFTPSyncUI
             catch (Exception ex)
             {
                 throw new ApplicationException($"Failed to load settings: {ex.Message}");
+            }
+
+            // Verify settings
+            if (settings != null)
+            {
+                var setingsChanged = false;
+
+                if (!string.IsNullOrWhiteSpace(settings.LocalPath)
+                    && !Directory.Exists(settings.LocalPath))
+                {
+                    settings.LocalPath = String.Empty;
+                    setingsChanged = true;
+                }
+
+                foreach (string dir in settings.ExcludedDirectories)
+                {
+                    if (!Directory.Exists(dir))
+                    {
+                        settings.ExcludedDirectories.Remove(dir);
+                        setingsChanged = true;
+                    }
+                }
+
+                if (settings.AccessVerified &&
+                    (string.IsNullOrWhiteSpace(settings.RemoteHost) ||
+                     string.IsNullOrWhiteSpace(settings.RemoteUsername) ||
+                     string.IsNullOrWhiteSpace(settings.RemotePassword)))
+                {
+                    settings.AccessVerified = false;
+                    setingsChanged = true;
+                }
+
+                if (setingsChanged)
+                {
+                    settings.SaveToFile();
+                }
+
             }
 
             return settings ?? null;
@@ -124,7 +161,7 @@ namespace SFTPSyncUI
         {
             get => autoStartSync;
             set
-            {   
+            {
                 if (autoStartSync != value)
                 {
                     autoStartSync = value;

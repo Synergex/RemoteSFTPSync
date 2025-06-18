@@ -10,7 +10,7 @@ namespace SFTPSyncUI
     {
         public static string ExecutableFile = String.Empty;
 
-        public static AppSettings? Settings { get; private set; }
+        private static AppSettings? settings;
 
         private static MainForm? mainForm;
 
@@ -57,7 +57,7 @@ namespace SFTPSyncUI
             // Load settings
             try
             {
-                Settings = AppSettings.LoadFromFile();
+                settings = AppSettings.LoadFromFile();
             }
             catch (Exception ex)
             {
@@ -67,7 +67,7 @@ namespace SFTPSyncUI
             }
 
             // Do we have settings?
-            if (Settings == null)
+            if (settings == null)
             {
                 MessageBox.Show("Failed to load user settings!", Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Application.Exit();
@@ -75,9 +75,9 @@ namespace SFTPSyncUI
             }
 
             // Check the run at startup status is correct
-            if (Settings.StartAtLogin && !IsProgramInStartup())
+            if (settings.StartAtLogin && !IsProgramInStartup())
                 AddProgramToStartup();
-            else if (!Settings.StartAtLogin && IsProgramInStartup())
+            else if (!settings.StartAtLogin && IsProgramInStartup())
                 RemoveProgramFromStartup();
 
             // Create an OpenPipe server to listen for messages from other instances
@@ -86,7 +86,7 @@ namespace SFTPSyncUI
             // Run the main form (it will start hidden, but put an icon in the system tray)
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(mainForm = new MainForm());
+            Application.Run(mainForm = new MainForm(settings));
         }
 
         /// <summary>
@@ -185,16 +185,16 @@ namespace SFTPSyncUI
         /// <param name="loggerAction"></param>
         public static async void StartSync(Action<string> loggerAction)
         {
-            if (Settings == null)
+            if (settings == null)
                 return;
 
             Logger.LogUpdated += loggerAction;
             Logger.LogInfo("Starting sync workers...");
             mainForm?.SetStatusBarText("Performing initial sync...");
 
-            var director = new SyncDirector(Settings.LocalPath);
+            var director = new SyncDirector(settings.LocalPath);
 
-            foreach (var pattern in Settings.LocalSearchPattern.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var pattern in settings.LocalSearchPattern.Split(';', StringSplitOptions.RemoveEmptyEntries))
             {
                 if (RemoteSyncWorkers.Count > 0)
                 {
@@ -206,15 +206,15 @@ namespace SFTPSyncUI
                 try
                 {
                     RemoteSyncWorkers.Add(new RemoteSync(
-                        Settings.RemoteHost, 
-                        Settings.RemoteUsername, 
-                        DPAPIEncryption.Decrypt(Settings.RemotePassword), 
-                        Settings.LocalPath, 
-                        Settings.RemotePath, 
+                        settings.RemoteHost, 
+                        settings.RemoteUsername, 
+                        DPAPIEncryption.Decrypt(settings.RemotePassword), 
+                        settings.LocalPath, 
+                        settings.RemotePath, 
                         pattern, 
                         RemoteSyncWorkers.Count == 0, 
                         director,
-                        Settings.ExcludedDirectories));
+                        settings.ExcludedDirectories));
 
                     Logger.LogInfo($"Started sync worker {RemoteSyncWorkers.Count} for pattern {pattern}");
                 }

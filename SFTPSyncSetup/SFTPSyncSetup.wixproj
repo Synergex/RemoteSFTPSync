@@ -6,7 +6,7 @@
     <ProductVersion>3.10</ProductVersion>
     <ProjectGuid>5074cbcb-641b-4a9c-b3bc-8dd0b78810a6</ProjectGuid>
     <SchemaVersion>2.0</SchemaVersion>
-    <OutputName>SFTPSync-1.1</OutputName>
+    <OutputName>SFTPSync-1.2</OutputName>
     <OutputType>Package</OutputType>
     <Name>SFTPSyncSetup</Name>
   </PropertyGroup>

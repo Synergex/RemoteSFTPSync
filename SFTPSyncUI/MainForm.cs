@@ -8,15 +8,16 @@ namespace SFTPSyncUI
 {
     public partial class MainForm : Form
     {
+        private AppSettings _settings;
         private NotifyIcon notifyIcon;
         private ContextMenuStrip contextMenu;
-        private bool initialUiLoad = false;
         private bool syncRunning = false;
         private string helpFilePath = string.Empty;
 
-        public MainForm()
+        public MainForm(AppSettings settings)
         {
             InitializeComponent();
+            _settings = settings;
 
             // Create a system tray icon
 
@@ -27,14 +28,6 @@ namespace SFTPSyncUI
                 Text = Application.ProductName,
                 Visible = true
             };
-
-            // Can't happen, but suppresses "might be null" warnings below
-            if (SFTPSyncUI.Settings == null)
-            {
-                MessageBox.Show("Settings not loaded", Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Application.Exit();
-                return;
-            }
 
             // Add context menu items
 
@@ -58,20 +51,13 @@ namespace SFTPSyncUI
 
             if (File.Exists(helpFilePath))
             {
-                contextMenu.Items.Add("Help", null, (s, e) =>
-                {
-                    ShowHelp();
-                });
+                contextMenu.Items.Add("Help", null, (s, e) => { ShowHelp(); });
                 mnuHelpView.Enabled = true;
             }
 
             contextMenu.Items.Add(new ToolStripSeparator());
 
-            contextMenu.Items.Add("Exit", null, (s, e) =>
-            {
-                //The user asked us to close the application
-                StopApplication();
-            });
+            contextMenu.Items.Add("Exit", null, (s, e) => { StopApplication(); });
 
             // Assign the context menu to the notify icon
             notifyIcon.ContextMenuStrip = contextMenu;
@@ -85,28 +71,13 @@ namespace SFTPSyncUI
                 ShowInTaskbar = true;
             };
 
-            //Load the current settings
-            initialUiLoad = true;
-            textBoxLocalPath.Text = SFTPSyncUI.Settings.LocalPath;
-            textBoxSearchSpec.Text = SFTPSyncUI.Settings.LocalSearchPattern;
-            textBoxRemoteHost.Text = SFTPSyncUI.Settings.RemoteHost;
-            textBoxRemotePath.Text = SFTPSyncUI.Settings.RemotePath;
-            textBoxRemoteUser.Text = SFTPSyncUI.Settings.RemoteUsername;
-            textBoxRemotePassword.Text = DPAPIEncryption.Decrypt(SFTPSyncUI.Settings.RemotePassword);
-            checkStartAtLogin.Checked = SFTPSyncUI.Settings.StartAtLogin;
-            checkStartInTray.Checked = SFTPSyncUI.Settings.StartInTray;
-            checkBoxAutoStartSync.Checked = SFTPSyncUI.Settings.AutoStartSync;
-            initialUiLoad = false;
-
             //Set the initial window visibility
-            ShowInTaskbar = !checkStartInTray.Checked;
-            WindowState = checkStartInTray.Checked ? FormWindowState.Minimized : FormWindowState.Normal;
+            ShowInTaskbar = _settings.StartInTray;
+            WindowState = _settings.StartInTray ? FormWindowState.Minimized : FormWindowState.Normal;
 
             // Can we and should we start the sync process now?
-            if (enableDisableStartSync() && checkBoxAutoStartSync.Checked)
-            {
+            if (checkCanStartSync() && _settings.AutoStartSync)
                 startSync();
-            }
         }
         private void mnuFileExit_Click(object sender, EventArgs e)
         {
@@ -174,146 +145,6 @@ namespace SFTPSyncUI
             }
         }
 
-        private void buttonLocalPath_Click(object sender, EventArgs e)
-        {
-            using var folderDialog = new FolderBrowserDialog
-            {
-                Description = "Local path",
-                UseDescriptionForTitle = true,
-                ShowNewFolderButton = true,
-                InitialDirectory = !String.IsNullOrWhiteSpace(textBoxLocalPath.Text) && Directory.Exists(textBoxLocalPath.Text)
-                ? textBoxLocalPath.Text
-                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
-            };
-
-            if (folderDialog.ShowDialog() == DialogResult.OK && !string.IsNullOrWhiteSpace(folderDialog.SelectedPath))
-            {
-                textBoxLocalPath.Text = folderDialog.SelectedPath;
-            }
-        }
-
-        private void textBoxLocalPath_TextChanged(object sender, EventArgs e)
-        {
-            if (initialUiLoad)
-                return;
-
-            if (String.IsNullOrWhiteSpace(textBoxLocalPath.Text) || Directory.Exists(textBoxLocalPath.Text))
-            {
-                if (SFTPSyncUI.Settings != null)
-                {
-                    SFTPSyncUI.Settings.LocalPath = textBoxLocalPath.Text;
-                }
-            }
-            enableDisableStartSync();
-        }
-
-        private void textBoxSearchSpec_TextChanged(object sender, EventArgs e)
-        {
-            if (initialUiLoad)
-                return;
-
-            if (String.IsNullOrWhiteSpace(textBoxLocalPath.Text) || searchSpecOK())
-            {
-                if (SFTPSyncUI.Settings != null)
-                {
-                    SFTPSyncUI.Settings.LocalSearchPattern = textBoxSearchSpec.Text;
-                }
-            }
-            enableDisableStartSync();
-        }
-
-        private bool searchSpecOK()
-        {
-            //TODO: Need real validation here!
-
-
-            return !String.IsNullOrWhiteSpace(textBoxSearchSpec.Text);
-        }
-
-        private void textBoxRemotePath_TextChanged(object sender, EventArgs e)
-        {
-            if (initialUiLoad)
-                return;
-
-            if (SFTPSyncUI.Settings != null)
-            {
-                SFTPSyncUI.Settings.RemotePath = textBoxRemotePath.Text;
-            }
-            enableDisableStartSync();
-        }
-
-        private void textBoxRemoteHost_TextChanged(object sender, EventArgs e)
-        {
-            if (initialUiLoad)
-                return;
-
-            if (SFTPSyncUI.Settings != null && !SFTPSyncUI.Settings.RemoteHost.Equals(textBoxRemoteHost.Text))
-            {
-                SFTPSyncUI.Settings.RemoteHost = textBoxRemoteHost.Text;
-                SFTPSyncUI.Settings.AccessVerified = false;
-            }
-            enableDisableStartSync();
-        }
-
-        private void textBoxRemoteUser_TextChanged(object sender, EventArgs e)
-        {
-            if (initialUiLoad)
-                return;
-
-            if (SFTPSyncUI.Settings != null && !SFTPSyncUI.Settings.RemoteUsername.Equals(textBoxRemoteUser.Text))
-            {
-                SFTPSyncUI.Settings.RemoteUsername = textBoxRemoteUser.Text;
-                SFTPSyncUI.Settings.AccessVerified = false;
-            }
-            enableDisableStartSync();
-        }
-
-        private void textBoxRemotePassword_TextChanged(object sender, EventArgs e)
-        {
-            if (initialUiLoad)
-                return;
-
-            if (SFTPSyncUI.Settings != null && !SFTPSyncUI.Settings.RemotePassword.Equals(DPAPIEncryption.Encrypt(textBoxRemotePassword.Text)))
-            {
-                SFTPSyncUI.Settings.RemotePassword = DPAPIEncryption.Encrypt(textBoxRemotePassword.Text);
-                SFTPSyncUI.Settings.AccessVerified = false;
-            }
-            enableDisableStartSync();
-        }
-
-        private void checkStartAtLogin_CheckedChanged(object sender, EventArgs e)
-        {
-            if (initialUiLoad)
-                return;
-
-            if (SFTPSyncUI.Settings != null)
-            {
-                SFTPSyncUI.Settings.StartAtLogin = checkStartAtLogin.Checked;
-            }
-        }
-
-        private void checkStartInTray_CheckedChanged(object sender, EventArgs e)
-        {
-            if (initialUiLoad)
-                return;
-
-            if (SFTPSyncUI.Settings != null)
-            {
-                SFTPSyncUI.Settings.StartInTray = checkStartInTray.Checked;
-            }
-        }
-
-        private void checkBoxAutoStartSync_CheckedChanged(object sender, EventArgs e)
-        {
-            if (initialUiLoad)
-                return;
-
-            if (SFTPSyncUI.Settings != null)
-            {
-                SFTPSyncUI.Settings.AutoStartSync = checkBoxAutoStartSync.Checked;
-            }
-        }
-
         private void AppendLog(string message)
         {
             if (InvokeRequired)
@@ -340,52 +171,25 @@ namespace SFTPSyncUI
             }
         }
 
-        private bool enableDisableStartSync()
+        private bool checkCanStartSync()
         {
-            if (SFTPSyncUI.Settings == null)
+            if (_settings == null)
                 return false;
 
-            buttonVerifyAccess.Enabled = SFTPSyncUI.Settings.AccessVerified == false
-                && !String.IsNullOrWhiteSpace(textBoxRemoteHost.Text)
-                && !String.IsNullOrWhiteSpace(textBoxRemoteUser.Text)
-                && !String.IsNullOrWhiteSpace(textBoxRemotePassword.Text);
+            var canStart =
+                //Local settings OK
+                !String.IsNullOrWhiteSpace(_settings.LocalPath) && Directory.Exists(_settings.LocalPath)
+                && isValidSearchSpec(_settings.LocalSearchPattern)
+                //Remote settings OK
+                && !String.IsNullOrWhiteSpace(_settings.RemotePath)
+                && !String.IsNullOrWhiteSpace(_settings.RemoteHost)
+                && !String.IsNullOrWhiteSpace(_settings.RemoteUsername)
+                && !String.IsNullOrWhiteSpace(_settings.RemotePassword)
+                && _settings.AccessVerified;
 
-            if (SFTPSyncUI.Settings.AccessVerified == false)
-            {
-                buttonStartStopSync.Enabled = false;
-                return false;
-            }
+            mnuFileStartSync.Enabled = canStart;
 
-            bool allOk = true;
-
-            //Local path validation (must be non-blank and a valid directory)
-
-            if (String.IsNullOrWhiteSpace(textBoxLocalPath.Text) || !Directory.Exists(textBoxLocalPath.Text))
-                allOk = false;
-
-            //Search spec validation (has to be a semi-colon delimited list of file extensions)
-            if (allOk && !isValidSearchSpec(textBoxSearchSpec.Text))
-                allOk = false;
-
-            //Remote path validation (just has to be non-null)
-            if (allOk && String.IsNullOrWhiteSpace(textBoxRemotePath.Text))
-                allOk = false;
-
-            //Remote host validation (just has to be non-null)
-            if (allOk && String.IsNullOrWhiteSpace(textBoxRemoteHost.Text))
-                allOk = false;
-
-            //Remote username validation (just has to be non-null)
-            if (allOk && String.IsNullOrWhiteSpace(textBoxRemoteUser.Text))
-                allOk = false;
-
-            //Remote password validation (just has to be non-null)
-            if (allOk && String.IsNullOrWhiteSpace(textBoxRemotePassword.Text))
-                allOk = false;
-
-            buttonStartStopSync.Enabled = allOk;
-
-            return allOk;
+            return canStart;
         }
 
         public static bool isValidSearchSpec(string input)
@@ -405,46 +209,38 @@ namespace SFTPSyncUI
             // Check each pattern
             return patterns.All(p => wildcardRegex.IsMatch(p));
         }
-        private void buttonStartStopSync_Click(object sender, EventArgs e)
+
+        private void mnuFileStartSync_Click(object sender, EventArgs e)
         {
-            if (syncRunning)
-            {
-                stopSync();
-            }
-            else
-            {
-                startSync();
-            }
+            startSync();
+        }
+
+        private void mnuFileStopSync_Click(object sender, EventArgs e)
+        {
+            stopSync();
         }
 
         private void startSync()
         {
-            syncRunning = true;
-            configureUI();
-            SFTPSyncUI.StartSync(AppendLog);
+            if (!syncRunning)
+            {
+                mnuFileStartSync.Enabled = false;
+                //TODO: Can't currently enable stop sync because it crashes the app
+                //mnuFileStopSync.Enabled = true; 
+                syncRunning = true;
+                SFTPSyncUI.StartSync(AppendLog);
+            }
         }
 
         private void stopSync()
         {
-            syncRunning = false;
-            configureUI();
-            SFTPSyncUI.StopSync(AppendLog);
-        }
-
-        private void configureUI()
-        {
-            textBoxLocalPath.Enabled = !syncRunning;
-            buttonLocalPath.Enabled = !syncRunning;
-            textBoxSearchSpec.Enabled = !syncRunning;
-            textBoxRemotePath.Enabled = !syncRunning;
-            btnExclusions.Enabled = !syncRunning;
-            textBoxRemoteHost.Enabled = !syncRunning;
-            textBoxRemoteUser.Enabled = !syncRunning;
-            textBoxRemotePassword.Enabled = !syncRunning;
-            checkBoxShowPassword.Enabled = !syncRunning;
-            buttonVerifyAccess.Enabled = !syncRunning;
-
-            buttonStartStopSync.Text = syncRunning ? "&Stop Sync" : "&Start Sync";
+            if (syncRunning)
+            {
+                SFTPSyncUI.StopSync(AppendLog);
+                syncRunning = false;
+                mnuFileStartSync.Enabled = true;
+                mnuFileStopSync.Enabled = false;
+            }
         }
 
         /// <summary>
@@ -463,48 +259,6 @@ namespace SFTPSyncUI
             }
         }
 
-        private void checkBoxShowPassword_CheckedChanged(object sender, EventArgs e)
-        {
-            textBoxRemotePassword.UseSystemPasswordChar = !checkBoxShowPassword.Checked;
-        }
-
-        private void buttonVerifyAccess_Click(object sender, EventArgs e)
-        {
-            //We get here if any of remote host, user and password all have values, and
-            //one or more of them have changed, and the user clicked the "Verify Access"
-            //button. We'll verify by attempting to make an SFTP connection to the remote
-            //system using the credentials provided.
-
-            using (SftpClient sftp = new SftpClient(textBoxRemoteHost.Text, textBoxRemoteUser.Text, textBoxRemotePassword.Text))
-            {
-                if (SFTPSyncUI.Settings == null)
-                    return;
-
-                try
-                {
-                    Cursor.Current = Cursors.WaitCursor;
-                    sftp.Connect();
-                    Cursor.Current = Cursors.Default;
-                    MessageBox.Show("Access verified.", "Access Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    SFTPSyncUI.Settings.AccessVerified = true;
-                    enableDisableStartSync();
-                }
-                catch (Exception)
-                {
-                    Cursor.Current = Cursors.Default;
-                    MessageBox.Show("Failed to verify access.", "Access Check", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                finally
-                {
-                    if (sftp != null && sftp.IsConnected)
-                    {
-                        sftp.Disconnect();
-                    }
-                }
-            }
-
-        }
-
         public void SetStatusBarText(string text)
         {
             if (InvokeRequired)
@@ -517,19 +271,14 @@ namespace SFTPSyncUI
             }
         }
 
-        private void btnExclusions_Click(object sender, EventArgs e)
+        private void mnuToolsOptions_Click(object sender, EventArgs e)
         {
-            var dialog = new ExclusionsForm();
-
-            //Load exclusions from the settings file
-            if (SFTPSyncUI.Settings != null)
-                dialog.ExcludedDirectories = SFTPSyncUI.Settings.ExcludedDirectories;
-
+            var dialog = new SettingsForm(_settings,syncRunning);
             dialog.ShowDialog(this);
 
-            //Save exclusions to the settings file
-            if (SFTPSyncUI.Settings != null)
-                SFTPSyncUI.Settings.ExcludedDirectories = dialog.ExcludedDirectories;
+            if (!syncRunning)
+                checkCanStartSync();
+
         }
     }
 }
