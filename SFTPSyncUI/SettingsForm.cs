@@ -29,7 +29,9 @@ namespace SFTPSyncUI
             //Remote system settings
             textBoxRemoteHost.Text = _settings.RemoteHost;
             textBoxRemoteUser.Text = _settings.RemoteUsername;
-            textBoxRemotePassword.Text = DPAPIEncryption.Decrypt(_settings.RemotePassword);
+
+            textBoxRemotePassword.Text = _settings.RemotePassword.Length > 0 ? DPAPIEncryption.Decrypt(_settings.RemotePassword) : String.Empty;
+
             textBoxRemotePath.Text = _settings.RemotePath;
             buttonVerifyAccess.Enabled = !_settings.AccessVerified;
 
