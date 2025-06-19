@@ -17,4 +17,5 @@ Two versions of the application are available, a Windows desktop application,
 and a command line application.
 
 For additional information on how to use the application, please refer to the
-Windows help file once installed.
+[Documentation](https://synergex.github.io/RemoteSFTPSync/), which is also 
+available as a Windows help file once you have installed the tool.
