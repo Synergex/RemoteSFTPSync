@@ -1,0 +1,150 @@
+﻿<!DOCTYPE html>
+<html>
+<head lang="en">
+<title>Welcome to SFTP Sync</title>
+<meta charset="UTF-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1" />
+<meta name="generator" content="HelpSmith 10.1 (Build 24.1202)" />
+<link type="text/css" rel="stylesheet" href="css/tree.css?b1fab730" />
+<link type="text/css" rel="stylesheet" href="css/topics.css?404b9198" />
+<link type="text/css" rel="stylesheet" href="css/apr.css?404b9198" />
+<link type="text/css" rel="stylesheet" href="css/app.css?404b9198" />
+<script src="js/jquery-3.7.1.min.js"></script>
+<script src="js/tree.min.js?b1fab730"></script>
+<script src="js/tabs.min.js?b1fab730"></script>
+<script src="js/jquery.cookie.js?b1fab730"></script>
+<script src="js/headroom.min.js?b1fab730"></script>
+<script src="js/app.min.js?b1fab730"></script>
+<script src="js/search.min.js?b1fab730"></script>
+<!-- Web Help Topic -->
+  
+<!-- HTML Help (CHM) Topic -->
+<script>
+doAppStart();
+</script>
+</head>
+<body>
+	<header>
+		<div id="hs-header-d">
+			<div id="hs-content-h">
+  <div id="hs-wrapper-h">
+    
+    <span id="hs-title-h">SFTP Sync</span>
+  </div>
+</div>
+		</div>
+		<div id="hs-header-m">
+			<div id="hs-content-m">
+  <div id="hs-area-left">
+    <div id="hs-menu" class="hs-menu-toggle">
+      <span class="line1"></span>
+      <span class="line2"></span>
+      <span class="line3"></span>
+    </div>
+  </div>
+  <div id="hs-area-center">
+    <span id="hs-title-m">SFTP Sync</span>
+  </div>
+  <div id="hs-area-right">
+    
+  </div>
+</div>
+		</div>
+	</header>
+	<nav id="hs-nav">
+		<div id="hs-nav-content">
+			<ul id="nav-tabs" role="tablist">
+				<li class="hs-toc-tab" role="tab">
+					<a href="#hs-toc-panel">Contents</a>
+				</li>
+				
+				<li class="hs-search-tab" role="tab">
+					<a href="#hs-search-panel">Search</a>
+				</li>
+			</ul>
+			<div id="tabs-panels">
+				<div class="hstabs-panel" id="hs-toc-panel" role="tabpanel">
+					<div id="toc-tree" class="hs-tree"></div>
+				</div>
+				
+				<div class="hstabs-panel" id="hs-search-panel" role="tabpanel">
+					<div id="hs-search-content">
+						<div id="search-form">
+							<label for="squery" class="sfield-title text-label">Enter your search term:</label>
+							<div id="search-box">
+								<div class="search-container">
+									<input type="text" id="squery" autocomplete="off">
+								</div>
+								<div class="search-btn" title="Search"></div>
+							</div>
+							<div id="options-box">
+								<span class="text-label">Match:</span>
+								<input type="radio" id="anywords" name="match" value="anywords" checked="checked"><label for="anywords" class="text-label">Any words</label>
+								<input type="radio" id="phrase" name="match" value="phrase"><label for="phrase" class="text-label">Phrase</label>
+							</div>
+						</div>
+						<div id="search-result"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+		</nav>
+		<div id="hs-content">
+			<main>
+				<article>
+					<div id="topic-content">
+  <div id="content-box" class="page0">
+    <div class="block0">
+      <table class="align-c tbl0">
+        <tr class="row0">
+          <td class="cell0">
+            <p class="ps0"><span class="ts0">&lt;Root level&gt;</span></p>
+            <h1 class="hd0"><span class="ts1">Welcome to SFTP Sync</span></h1>
+          </td>
+          <td class="cell1">
+            <p class="ps1"><a href="mailto:support@yourdomain.com?subject=Comments%20on%20topic%20%22Welcome%20to%20SFTP%20Sync%22." class="hs0">Send comments</a><span class="ts0">&nbsp;on this topic</span></p>
+            <p class="ps2"><a href="downloadandinstall.html" title="Downloading and Installing" class="hs0">Next →</a></p>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <p class="ps3"><span class="ts2">SFTP Sync is a utility application that can synchronize a local directory structure and files to a remote OpenVMS system via the Secure FTP protocol.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">When first activated the product will first check whether the local and remote directories are synchronized, and if not will update the remote directories and files to match the local directories and files. This includes deleting any remote files that no longer exist in the local directories.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Once synchronized the application then monitors the local directories for changes, and replicates those changes in the remote system. </span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Two versions of the application are available, one with a Windows user interface, and one used from the Windows command line.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <h3 class="hd1"><span class="ts4">Important Usage Information</span></h3>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Regardless of whether you use the command-line or Windows desktop application, it is important that you understand how the product works, so please read the information below carefully.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">When you first start the command-line product, or enable sync in the Windows desktop tool, a worker thread is created to take care of syncing each of the file spec patterns that you have specified. So if you have specified four file extensions, like this:</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts5">*.DBL;*.DEF;*.COM;*.SCM</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Then multiple worker threads are started, one to handle each file extension pattern.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Before any files can be synced the entire directory tree must be present on the remote system, and ensuring that this is the case is a task assigned to the first worker thread to be created. Once that task has been completed, that thread can then begin the task of checking whether the files on the remote system currently match the files on the local system, and uploading any missing files for that file extension.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">As soon as the first worker thread has completed it's additional task of checking the directory structure, any other worker threads will be created and will go to work performing the initial synchronization based on their assigned file extension pattern.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">As soon as each worker thread has completed its initial sync, it starts monitoring the file system for changes to files matching the assigned file extension pattern and replicating those changes to the remote system.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">When real time synchronization commences you will see a message </span><span class="ts6">Initial sync complete, real-time sync now active</span><span class="ts2">.</span><span class="ts2">&nbsp;You should not make changes to files in your local directories tree until you have seen this message.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <div class="hr-wrapper">
+      <hr class="hline0" />
+    </div>
+    <p class="ps0"><span class="ts0">Copyright &copy; 2025 Synergex International, Inc.</span></p>
+  </div>
+</div>
+				</article>
+			</main>
+		</div>
+		
+</body>
+</html>

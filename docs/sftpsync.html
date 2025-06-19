@@ -1,0 +1,188 @@
+﻿<!DOCTYPE html>
+<html>
+<head lang="en">
+<title>Command Line Application</title>
+<meta charset="UTF-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1" />
+<meta name="generator" content="HelpSmith 10.1 (Build 24.1202)" />
+<link type="text/css" rel="stylesheet" href="css/tree.css?b1fab730" />
+<link type="text/css" rel="stylesheet" href="css/topics.css?404b9198" />
+<link type="text/css" rel="stylesheet" href="css/apr.css?404b9198" />
+<link type="text/css" rel="stylesheet" href="css/app.css?404b9198" />
+<script src="js/jquery-3.7.1.min.js"></script>
+<script src="js/tree.min.js?b1fab730"></script>
+<script src="js/tabs.min.js?b1fab730"></script>
+<script src="js/jquery.cookie.js?b1fab730"></script>
+<script src="js/headroom.min.js?b1fab730"></script>
+<script src="js/app.min.js?b1fab730"></script>
+<script src="js/search.min.js?b1fab730"></script>
+<!-- Web Help Topic -->
+  
+<!-- HTML Help (CHM) Topic -->
+<script>
+doAppStart();
+</script>
+</head>
+<body>
+	<header>
+		<div id="hs-header-d">
+			<div id="hs-content-h">
+  <div id="hs-wrapper-h">
+    
+    <span id="hs-title-h">SFTP Sync</span>
+  </div>
+</div>
+		</div>
+		<div id="hs-header-m">
+			<div id="hs-content-m">
+  <div id="hs-area-left">
+    <div id="hs-menu" class="hs-menu-toggle">
+      <span class="line1"></span>
+      <span class="line2"></span>
+      <span class="line3"></span>
+    </div>
+  </div>
+  <div id="hs-area-center">
+    <span id="hs-title-m">SFTP Sync</span>
+  </div>
+  <div id="hs-area-right">
+    
+  </div>
+</div>
+		</div>
+	</header>
+	<nav id="hs-nav">
+		<div id="hs-nav-content">
+			<ul id="nav-tabs" role="tablist">
+				<li class="hs-toc-tab" role="tab">
+					<a href="#hs-toc-panel">Contents</a>
+				</li>
+				
+				<li class="hs-search-tab" role="tab">
+					<a href="#hs-search-panel">Search</a>
+				</li>
+			</ul>
+			<div id="tabs-panels">
+				<div class="hstabs-panel" id="hs-toc-panel" role="tabpanel">
+					<div id="toc-tree" class="hs-tree"></div>
+				</div>
+				
+				<div class="hstabs-panel" id="hs-search-panel" role="tabpanel">
+					<div id="hs-search-content">
+						<div id="search-form">
+							<label for="squery" class="sfield-title text-label">Enter your search term:</label>
+							<div id="search-box">
+								<div class="search-container">
+									<input type="text" id="squery" autocomplete="off">
+								</div>
+								<div class="search-btn" title="Search"></div>
+							</div>
+							<div id="options-box">
+								<span class="text-label">Match:</span>
+								<input type="radio" id="anywords" name="match" value="anywords" checked="checked"><label for="anywords" class="text-label">Any words</label>
+								<input type="radio" id="phrase" name="match" value="phrase"><label for="phrase" class="text-label">Phrase</label>
+							</div>
+						</div>
+						<div id="search-result"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+		</nav>
+		<div id="hs-content">
+			<main>
+				<article>
+					<div id="topic-content">
+  <div id="content-box" class="page0">
+    <div class="block0">
+      <table class="align-c tbl0">
+        <tr class="row0">
+          <td class="cell0">
+            <p class="ps0"><span class="ts0">&lt;Root level&gt;</span></p>
+            <h1 class="hd0"><span class="ts1">Command Line Application</span></h1>
+          </td>
+          <td class="cell1">
+            <p class="ps1"><a href="mailto:support@yourdomain.com?subject=Comments%20on%20topic%20%22Command%20Line%20Application%22." class="hs0">Send comments</a><span class="ts0">&nbsp;on this topic</span></p>
+            <p class="ps2"><a href="sftpsyncui.html" title="Desktop Application" class="hs0">← Previous</a><span class="ts0">&nbsp;</span><a href="uninstalling.html" title="Uninstalling" class="hs0">Next →</a></p>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <p class="ps3"><span class="ts2">The Windows command-line application is provided via a program called SFTPSync.exe. </span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">The application accepts configuration information via command line arguments.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">If you execute the application with no command line arguments, usage information will be displayed, like this:</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts5">C:\Program Files\Synergex\SFTPSync&gt; SftpSync</span></p>
+    <p class="ps3"><span class="ts9">&nbsp;</span></p>
+    <p class="ps3"><span class="ts5">usage: SFTPSync host username password localRootDir remoteRootDir searchPattern</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <h2 class="hd1"><span class="ts8">Command Line Parameters</span></h2>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">The command line parameters correspond to the various options in the Wind</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <h3 class="hd1"><span class="ts4">host</span></h3>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Specify the DNS name or TCP/IP address of the remote OpenVMS system to be accessed. For example:</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts5">VMSDEV1.MYDOMAIN.COM</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">or</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts5">10.1.1.15</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <h3 class="hd1"><span class="ts4">username</span></h3>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Specify the user name of the OpenVMS user account to be used to log in to the remote system. Note that OpenVMS user account names are not usually case sensitive, but in some cases can be.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <h3 class="hd1"><span class="ts4">password</span></h3>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Specify the password associated with the OpenVMS user account to be used to log in to the remote system. Note that OpenVMS passwords are not usually case sensitive, but in some cases can be.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">The value entered into the password field is normally hidden, but can be revealed by checking the Show password option.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">As with the other configuration details, the password is stored in the applications configuration file, but in an encrypted form. The encryption used keys provided by the Windows operating system that are associated with the current Windows user account, and so can only be decrypted when logged into the same account.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <h3 class="hd1"><span class="ts4">localRootDir</span></h3>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Specify the local root directory to be replicated. All files in and below this directory that match the search spec (below) will be replicated to the remote OpenVMS system. You can use the ellipsis button (...) adjacent to the field to show a directory browser dialog to make it easy to pick a local directory. The value of the field should look like this:</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts5">C:\MYDEVFILES\MYPROJECT</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">If the path includes spaces then enclose the value in double quotation marks.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <h3 class="hd1"><span class="ts4">remoteRootDir</span></h3>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Specify a path on the remote OpenVMS system that represents the root directory for the replicated files. The path must be expressed in Unix format, and to some extent depends on the configuration of your system. In many cases an OpenVMS path like DKA0:[MYUSER.DEVFILES.MYPROJECT] will be specified like this:</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts5">/DISK$DKA0/MYUSER/DEVFILES/MYPROJECT/</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">But your system may require something different. To determine the value of the remote path we recommend using an application such as WinSCP or FileZilla to make an SFTP connection to the system and user account, and then determine the path based on what you see in that application.</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <h3 class="hd1"><span class="ts4">searchPattern</span></h3>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Specify a semi-colon delimited list of file patterns to be matched and replicated. For example if you want to replicate all files with DBL, DEF and INC file extensions to the remote system then your search spec would look like this:</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts5">*.DBL;*.DEF;*.INC</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <h2 class="hd1"><span class="ts8">Example Command</span></h2>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">Here is an example command:</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p class="ps3"><span class="ts2">C:\&gt; &quot;C:\Program Files\Synergex\SFTPSync.exe&quot; VMSDEV1.MYDOMAIN.COM MYUSER MYPASSWORD &quot;C:\MY DEV FILES\MY PROJECT&quot; /DISK$DKA0/MYUSER/DEVFILES/MYPROJECT/ *.DBL;*.DEF;*.INC</span></p>
+    <p class="ps3"><span class="ts3">&nbsp;</span></p>
+    <p><span class="ts10">&nbsp;</span></p>
+    <div class="hr-wrapper">
+      <hr class="hline0" />
+    </div>
+    <p class="ps0"><span class="ts0">Copyright &copy; 2025 Synergex International, Inc.</span></p>
+  </div>
+</div>
+				</article>
+			</main>
+		</div>
+		
+</body>
+</html>
