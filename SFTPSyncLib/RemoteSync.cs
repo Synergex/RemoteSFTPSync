@@ -1,5 +1,4 @@
-﻿
-using Renci.SshNet;
+﻿using Renci.SshNet;
 using Renci.SshNet.Sftp;
 
 namespace SFTPSyncLib
@@ -49,6 +48,10 @@ namespace SFTPSyncLib
         public static void SyncFile(SftpClient sftp, string sourcePath, string destinationPath)
         {
             Logger.LogInfo($"Syncing {sourcePath} -> {destinationPath}");
+            if (sftp.Exists(destinationPath))
+            {
+                sftp.DeleteFile(destinationPath);
+            }
             sftp.WriteAllText(destinationPath, File.ReadAllText(sourcePath));
         }
 
