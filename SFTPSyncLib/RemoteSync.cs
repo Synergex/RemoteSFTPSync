@@ -17,7 +17,9 @@ namespace SFTPSyncLib
         SyncDirector _director;
         HashSet<string> _activeDirSync = new HashSet<string>();
 
+        
         public Task DoneMakingFolders { get; }
+
         public Task DoneInitialSync { get; }
 
         public RemoteSync(string host, string username, string password,
@@ -35,23 +37,39 @@ namespace SFTPSyncLib
             _sftp = new SftpClient(host, username, password);
             _sftp.Connect();
 
+            //Our first instance is responsible for creating all of the the directories
+            //Subsequent instances will not be created until this is done
             DoneMakingFolders = createFolders ? CreateDirectories(_localRootDirectory, _remoteRootDirectory) : Task.CompletedTask;
 
+            //Now perform the initial sync for the pattern this instance is responsible for
             DoneInitialSync = InitialSync(_localRootDirectory, _remoteRootDirectory);
 
+            //Once the initial sync is done, we can start watching the file system for changes
             DoneInitialSync.ContinueWith((tmp) =>
             {
                 _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
             });
         }
 
+        /// <summary>
+        /// Sync changes for a file. This is only used for changes AFTER the initial sync has completed.
+        /// </summary>
+        /// <param name="sftp">SFTP client</param>
+        /// <param name="sourcePath">Path to the source file</param>
+        /// <param name="destinationPath">Path to the destination file</param>
         public static void SyncFile(SftpClient sftp, string sourcePath, string destinationPath)
         {
             Logger.LogInfo($"Syncing {sourcePath} -> {destinationPath}");
+
+            //Because the VMS SFTP server uses Posix not RMS, and some older servers do not correctly
+            //handle truncating files when the content gets shorter (resulting in corruption at the end of the file),
+            //we delete the file first if it exists, before writing new content.
             if (sftp.Exists(destinationPath))
             {
                 sftp.DeleteFile(destinationPath);
             }
+
+            //Write the file content to the destination path
             sftp.WriteAllText(destinationPath, File.ReadAllText(sourcePath));
         }
 
@@ -105,8 +123,10 @@ namespace SFTPSyncLib
 
             try
             {
+                //Got local directories to sync
                 var localDirectories = FilteredDirectories(localPath);
 
+                //Get remote directories
                 var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
                 {
                     if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
@@ -115,13 +135,16 @@ namespace SFTPSyncLib
                         return item.Name;
                 });
 
+                //Compare local and remote directories, creating missing ones, and recurse for subdirectories
                 foreach (var item in localDirectories)
                 {
                     var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
                     if (!remoteDirectories.ContainsKey(directoryName))
                     {
+                        //Create new remote directory
                         _sftp.CreateDirectory(remotePath + "/" + directoryName);
                     }
+                    //And recurse for any subdirectories it may need
                     await CreateDirectories(localPath + "\\" + directoryName, remotePath + "/" + directoryName);
                 }
             }
@@ -133,11 +156,21 @@ namespace SFTPSyncLib
             }
         }
 
+        /// <summary>
+        /// For the pattern we are responsible for, sync the files in the local directory to the remote directory.
+        /// </summary>
+        /// <param name="localPath">Local directory path</param>
+        /// <param name="remotePath">Remote directory path</param>
+        /// <returns></returns>
         public async Task InitialSync(string localPath, string remotePath)
         {
+            //Wait for the folders to be created before starting the initial sync
             await DoneMakingFolders;
+
+            //Get the local directories to sync
             var localDirectories = FilteredDirectories(localPath);
 
+            //Get the remote directories to sync, removing the .DIR suffix if it exists
             var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
             {
                 if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
@@ -146,6 +179,7 @@ namespace SFTPSyncLib
                     return item.Name;
             });
 
+            //
             foreach (var item in localDirectories)
             {
                 var directoryName = item.Split(Path.DirectorySeparatorChar).Last();

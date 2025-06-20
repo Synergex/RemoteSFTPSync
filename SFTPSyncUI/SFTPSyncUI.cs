@@ -212,7 +212,7 @@ namespace SFTPSyncUI
                         settings.LocalPath, 
                         settings.RemotePath, 
                         pattern, 
-                        RemoteSyncWorkers.Count == 0, 
+                        RemoteSyncWorkers.Count == 0, // Only the first worker will create remote folders
                         director,
                         settings.ExcludedDirectories));
 
