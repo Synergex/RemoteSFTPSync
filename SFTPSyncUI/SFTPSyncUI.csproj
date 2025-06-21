@@ -20,10 +20,10 @@
     <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
     <Company>Synergex International, Inc.</Company>
-    <AssemblyVersion>1.2</AssemblyVersion>
-    <FileVersion>1.2</FileVersion>
+    <AssemblyVersion>1.3</AssemblyVersion>
+    <FileVersion>1.3</FileVersion>
     <LangVersion>preview</LangVersion>
-    <Version>1.2</Version>
+    <Version>1.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
