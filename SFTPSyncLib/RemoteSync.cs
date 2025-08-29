@@ -61,16 +61,43 @@ namespace SFTPSyncLib
         {
             Logger.LogInfo($"Syncing {sourcePath} -> {destinationPath}");
 
-            //Because the VMS SFTP server uses Posix not RMS, and some older servers do not correctly
-            //handle truncating files when the content gets shorter (resulting in corruption at the end of the file),
-            //we delete the file first if it exists, before writing new content.
-            if (sftp.Exists(destinationPath))
-            {
-                sftp.DeleteFile(destinationPath);
-            }
+            int retryCount = 0;
+            const int maxRetries = 5;
+            const int delayBetweenRetriesMs = 500;
 
-            //Write the file content to the destination path
-            sftp.WriteAllText(destinationPath, File.ReadAllText(sourcePath));
+            while (retryCount < maxRetries)
+            {
+                try
+                {
+                    // Because the VMS SFTP server uses Posix not RMS, and some older servers do not correctly
+                    // handle truncating files when the content gets shorter (resulting in corruption at the end of the file),
+                    // we delete the file first if it exists, before writing new content.
+                    if (sftp.Exists(destinationPath))
+                    {
+                        sftp.DeleteFile(destinationPath);
+                    }
+
+                    // Read the local file content
+                    var localFileContent = File.ReadAllText(sourcePath);
+
+                    // Write the remote file
+                    sftp.WriteAllText(destinationPath, localFileContent);
+
+                    return;
+                }
+                catch (Exception ex) when (ex is IOException || ex is FileNotFoundException)
+                {
+                    retryCount++;
+                    if (retryCount >= maxRetries)
+                    {
+                        Logger.LogError($"Failed to sync after {maxRetries} retries. Exception: {ex.Message}");
+                        return;
+                    }
+
+                    Logger.LogInfo($"Retry {retryCount}/{maxRetries} after exception: {ex.Message}");
+                    Thread.Sleep(delayBetweenRetriesMs);
+                }
+            }
         }
 
         public static Task<IEnumerable<FileInfo>> SyncDirectoryAsync(SftpClient sftp, string sourcePath, string destinationPath, string searchPattern)
@@ -265,7 +292,7 @@ namespace SFTPSyncLib
                 }
 
                 while (!IsFileReady(arg.FullPath))
-                    await Task.Delay(50);
+                    await Task.Delay(25);
 
 
                 lock (_activeDirSync)
