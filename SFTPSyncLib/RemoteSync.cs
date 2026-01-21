@@ -1,5 +1,6 @@
 ﻿using Renci.SshNet;
 using Renci.SshNet.Sftp;
+using System.Collections.Concurrent;
 
 namespace SFTPSyncLib
 {
@@ -51,6 +52,94 @@ namespace SFTPSyncLib
             {
                 _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
             });
+        }
+
+        public RemoteSync(string host, string username, string password,
+            string localRootDirectory, string remoteRootDirectory,
+            string searchPattern, SyncDirector director, List<string>? excludedFolders, Task initialSyncTask)
+        {
+            _host = host;
+            _username = username;
+            _password = password;
+            _searchPattern = searchPattern;
+            _localRootDirectory = localRootDirectory;
+            _remoteRootDirectory = remoteRootDirectory;
+            _director = director;
+            _excludedFolders = excludedFolders ?? new List<string>();
+            _sftp = new SftpClient(host, username, password);
+            _sftp.Connect();
+
+            DoneMakingFolders = Task.CompletedTask;
+            DoneInitialSync = initialSyncTask;
+
+            DoneInitialSync.ContinueWith((tmp) =>
+            {
+                _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
+            });
+        }
+
+        public static async Task RunSharedInitialSyncAsync(
+            string host,
+            string username,
+            string password,
+            string localRootDirectory,
+            string remoteRootDirectory,
+            string[] searchPatterns,
+            List<string>? excludedFolders,
+            int workerCount)
+        {
+            if (workerCount <= 0 || searchPatterns.Length == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                using (var sftp = new SftpClient(host, username, password))
+                {
+                    sftp.Connect();
+                    await CreateDirectoriesInternal(sftp, localRootDirectory, localRootDirectory, remoteRootDirectory, excludedFolders);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to create directories. Exception: {ex.Message}");
+                throw;
+            }
+
+            var workQueue = new ConcurrentQueue<SyncWorkItem>();
+            foreach (var pair in EnumerateLocalDirectories(localRootDirectory, remoteRootDirectory, excludedFolders))
+            {
+                foreach (var pattern in searchPatterns)
+                {
+                    workQueue.Enqueue(new SyncWorkItem(pair.LocalPath, pair.RemotePath, pattern));
+                }
+            }
+
+            var workers = new List<Task>();
+            for (int i = 0; i < workerCount; i++)
+            {
+                workers.Add(Task.Run(async () =>
+                {
+                    using (var sftp = new SftpClient(host, username, password))
+                    {
+                        sftp.Connect();
+                        while (workQueue.TryDequeue(out var item))
+                        {
+                            try
+                            {
+                                await SyncDirectoryAsync(sftp, item.LocalPath, item.RemotePath, item.SearchPattern);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.LogError($"Failed to sync {item.LocalPath} ({item.SearchPattern}). Exception: {ex.Message}");
+                            }
+                        }
+                    }
+                }));
+            }
+
+            await Task.WhenAll(workers);
         }
 
         /// <summary>
@@ -120,30 +209,7 @@ namespace SFTPSyncLib
 
         private string[] FilteredDirectories(string localPath)
         {
-            return Directory.GetDirectories(localPath).Where(path =>
-            {
-                var relativePath = path.Substring(_localRootDirectory.Length);
-
-                // Existing exclusions
-                bool isExcluded = relativePath.EndsWith(".git")
-                                  || relativePath.EndsWith(".vs")
-                                  || relativePath.EndsWith("bin")
-                                  || relativePath.EndsWith("obj")
-                                  || relativePath.Contains(".");
-
-                // Check _excludedFolders
-                if (!isExcluded && _excludedFolders != null && _excludedFolders.Count > 0)
-                {
-                    string fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
-                    isExcluded = _excludedFolders.Any(excluded =>
-                    {
-                        var excludedFullPath = Path.GetFullPath(excluded).TrimEnd(Path.DirectorySeparatorChar);
-                        return string.Equals(fullPath, excludedFullPath, StringComparison.OrdinalIgnoreCase);
-                    });
-                }
-
-                return !isExcluded;
-            }).ToArray();
+            return FilteredDirectories(_localRootDirectory, localPath, _excludedFolders);
         }
 
         public async Task CreateDirectories(string localPath, string remotePath)
@@ -155,30 +221,7 @@ namespace SFTPSyncLib
                 if (!EnsureConnectedSafe())
                     return;
 
-                //Got local directories to sync
-                var localDirectories = FilteredDirectories(localPath);
-
-                //Get remote directories
-                var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
-                {
-                    if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
-                        return item.Name.Remove(item.Name.IndexOf(".DIR", StringComparison.OrdinalIgnoreCase));
-                    else
-                        return item.Name;
-                });
-
-                //Compare local and remote directories, creating missing ones, and recurse for subdirectories
-                foreach (var item in localDirectories)
-                {
-                    var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
-                    if (!remoteDirectories.ContainsKey(directoryName))
-                    {
-                        //Create new remote directory
-                        _sftp.CreateDirectory(remotePath + "/" + directoryName);
-                    }
-                    //And recurse for any subdirectories it may need
-                    await CreateDirectories(localPath + "\\" + directoryName, remotePath + "/" + directoryName);
-                }
+                await CreateDirectoriesInternal(_sftp, _localRootDirectory, localPath, remotePath, _excludedFolders);
             }
             catch (Exception)
             {
@@ -222,6 +265,82 @@ namespace SFTPSyncLib
             }
 
             await SyncDirectoryAsync(_sftp, localPath, remotePath, _searchPattern);
+        }
+
+        private static string[] FilteredDirectories(string localRootDirectory, string localPath, List<string>? excludedFolders)
+        {
+            return Directory.GetDirectories(localPath).Where(path =>
+            {
+                var relativePath = path.Substring(localRootDirectory.Length);
+
+                bool isExcluded = relativePath.EndsWith(".git")
+                                  || relativePath.EndsWith(".vs")
+                                  || relativePath.EndsWith("bin")
+                                  || relativePath.EndsWith("obj")
+                                  || relativePath.Contains(".");
+
+                if (!isExcluded && excludedFolders != null && excludedFolders.Count > 0)
+                {
+                    string fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
+                    isExcluded = excludedFolders.Any(excluded =>
+                    {
+                        var excludedFullPath = Path.GetFullPath(excluded).TrimEnd(Path.DirectorySeparatorChar);
+                        return string.Equals(fullPath, excludedFullPath, StringComparison.OrdinalIgnoreCase);
+                    });
+                }
+
+                return !isExcluded;
+            }).ToArray();
+        }
+
+        private static IEnumerable<(string LocalPath, string RemotePath)> EnumerateLocalDirectories(
+            string localRootDirectory,
+            string remoteRootDirectory,
+            List<string>? excludedFolders)
+        {
+            var stack = new Stack<(string LocalPath, string RemotePath)>();
+            stack.Push((localRootDirectory, remoteRootDirectory));
+
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+                yield return current;
+
+                foreach (var directory in FilteredDirectories(localRootDirectory, current.LocalPath, excludedFolders))
+                {
+                    var directoryName = directory.Split(Path.DirectorySeparatorChar).Last();
+                    var remotePath = current.RemotePath + "/" + directoryName;
+                    stack.Push((directory, remotePath));
+                }
+            }
+        }
+
+        private static async Task CreateDirectoriesInternal(
+            SftpClient sftp,
+            string localRootDirectory,
+            string localPath,
+            string remotePath,
+            List<string>? excludedFolders)
+        {
+            var localDirectories = FilteredDirectories(localRootDirectory, localPath, excludedFolders);
+
+            var remoteDirectories = (await ListDirectoryAsync(sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
+            {
+                if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
+                    return item.Name.Remove(item.Name.IndexOf(".DIR", StringComparison.OrdinalIgnoreCase));
+                else
+                    return item.Name;
+            });
+
+            foreach (var item in localDirectories)
+            {
+                var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
+                if (!remoteDirectories.ContainsKey(directoryName))
+                {
+                    sftp.CreateDirectory(remotePath + "/" + directoryName);
+                }
+                await CreateDirectoriesInternal(sftp, localRootDirectory, localPath + "\\" + directoryName, remotePath + "/" + directoryName, excludedFolders);
+            }
         }
 
 
@@ -411,6 +530,20 @@ namespace SFTPSyncLib
                 _disposed = true;
                 _sftp.Dispose();
             }
+        }
+
+        private sealed class SyncWorkItem
+        {
+            public SyncWorkItem(string localPath, string remotePath, string searchPattern)
+            {
+                LocalPath = localPath;
+                RemotePath = remotePath;
+                SearchPattern = searchPattern;
+            }
+
+            public string LocalPath { get; }
+            public string RemotePath { get; }
+            public string SearchPattern { get; }
         }
     }
 }

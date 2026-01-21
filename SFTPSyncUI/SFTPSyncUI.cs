@@ -3,6 +3,7 @@ using Microsoft.Win32;
 using SFTPSyncLib;
 using System.IO.Pipes;
 using System.Reflection;
+using System.Linq;
 
 namespace SFTPSyncUI
 {
@@ -211,27 +212,51 @@ namespace SFTPSyncUI
 
             var director = new SyncDirector(settings.LocalPath);
 
-            foreach (var pattern in settings.LocalSearchPattern.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            var patterns = settings.LocalSearchPattern
+                .Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Select(pattern => pattern.Trim())
+                .Where(pattern => pattern.Length > 0)
+                .ToArray();
+
+            if (patterns.Length == 0)
             {
-                if (RemoteSyncWorkers.Count > 0)
-                {
-                    //The first sync worker will create all of the remote folders before it starts,
-                    //to sync files matching it's pattern so wait for it to finish before starting
-                    //the remaining sync workers
-                    await RemoteSyncWorkers[0].DoneMakingFolders;
-                }
+                Logger.LogError("No valid search patterns were configured.");
+                return;
+            }
+
+            Task initialSyncTask;
+            try
+            {
+                initialSyncTask = RemoteSync.RunSharedInitialSyncAsync(
+                    settings.RemoteHost,
+                    settings.RemoteUsername,
+                    DPAPIEncryption.Decrypt(settings.RemotePassword),
+                    settings.LocalPath,
+                    settings.RemotePath,
+                    patterns,
+                    settings.ExcludedDirectories,
+                    patterns.Length);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to start initial sync. Exception: {ex.Message}");
+                return;
+            }
+
+            foreach (var pattern in patterns)
+            {
                 try
                 {
                     RemoteSyncWorkers.Add(new RemoteSync(
-                        settings.RemoteHost, 
-                        settings.RemoteUsername, 
-                        DPAPIEncryption.Decrypt(settings.RemotePassword), 
-                        settings.LocalPath, 
-                        settings.RemotePath, 
-                        pattern, 
-                        RemoteSyncWorkers.Count == 0, // Only the first worker will create remote folders
+                        settings.RemoteHost,
+                        settings.RemoteUsername,
+                        DPAPIEncryption.Decrypt(settings.RemotePassword),
+                        settings.LocalPath,
+                        settings.RemotePath,
+                        pattern,
                         director,
-                        settings.ExcludedDirectories));
+                        settings.ExcludedDirectories,
+                        initialSyncTask));
 
                     Logger.LogInfo($"Started sync worker {RemoteSyncWorkers.Count} for pattern {pattern}");
                 }
@@ -242,7 +267,16 @@ namespace SFTPSyncUI
             }
 
             //Wait for all sync workers to finish initial sync then tell the user
-            await Task.WhenAll(RemoteSyncWorkers.Select(rsw => rsw.DoneInitialSync));
+            try
+            {
+                await initialSyncTask;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Initial sync failed. Exception: {ex.Message}");
+                mainForm?.SetStatusBarText("Initial sync failed");
+                return;
+            }
 
             Logger.LogInfo("Initial sync complete, real-time sync active");
             mainForm?.SetStatusBarText("Real time sync active");
