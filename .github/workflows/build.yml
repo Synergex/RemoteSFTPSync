@@ -41,7 +41,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output SFTPSync/bin/Release/net8.0-windows/publish/win-x64/ `
+          --output SFTPSync/bin/Release/net8.0-windows `
           /p:PublishSingleFile=true `
           /p:PublishReadyToRun=true
 
@@ -51,7 +51,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output SFTPSyncStop/bin/Release/net8.0-windows/publish/win-x64/ `
+          --output SFTPSyncStop/bin/Release/net8.0-windows `
           /p:PublishSingleFile=true `
           /p:PublishReadyToRun=true
 
@@ -61,7 +61,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output SFTPSyncUI/bin/Release/net8.0-windows/publish/win-x64/ `
+          --output SFTPSyncUI/bin/Release/net8.0-windows `
           /p:PublishSingleFile=true `
           /p:PublishReadyToRun=true
 
@@ -75,7 +75,7 @@ jobs:
         AZURE_CERT_NAME: ${{ secrets.AZURE_CERT_NAME }}
       shell: pwsh
       run: |
-        $publishDirs = @("SFTPSync/bin/Release/net8.0-windows/publish/win-x64", "SFTPSyncStop/bin/Release/net8.0-windows/publish/win-x64", "SFTPSyncUI/bin/Release/net8.0-windows/publish/win-x64")
+        $publishDirs = @("SFTPSync/bin/Release/net8.0-windows", "SFTPSyncStop/bin/Release/net8.0-windows", "SFTPSyncUI/bin/Release/net8.0-windows")
         foreach ($dir in $publishDirs) {
           if (Test-Path $dir) {
             $files = Get-ChildItem -Path $dir -Include *.exe, *.dll -Recurse

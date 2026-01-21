@@ -16,6 +16,8 @@ namespace SFTPSyncLib
         SftpClient _sftp;
         SyncDirector _director;
         HashSet<string> _activeDirSync = new HashSet<string>();
+        readonly SemaphoreSlim _sftpLock = new SemaphoreSlim(1, 1);
+        bool _disposed;
 
         
         public Task DoneMakingFolders { get; }
@@ -85,7 +87,7 @@ namespace SFTPSyncLib
 
                     return;
                 }
-                catch (Exception ex) when (ex is IOException || ex is FileNotFoundException)
+                catch (Exception ex)
                 {
                     retryCount++;
                     if (retryCount >= maxRetries)
@@ -150,6 +152,9 @@ namespace SFTPSyncLib
 
             try
             {
+                if (!EnsureConnectedSafe())
+                    return;
+
                 //Got local directories to sync
                 var localDirectories = FilteredDirectories(localPath);
 
@@ -193,6 +198,9 @@ namespace SFTPSyncLib
         {
             //Wait for the folders to be created before starting the initial sync
             await DoneMakingFolders;
+
+            if (!EnsureConnectedSafe())
+                return;
 
             //Get the local directories to sync
             var localDirectories = FilteredDirectories(localPath);
@@ -256,58 +264,143 @@ namespace SFTPSyncLib
             }
         }
 
+        private void EnsureConnected()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(RemoteSync));
+
+            if (_sftp.IsConnected)
+                return;
+
+            _sftp.Connect();
+        }
+
+        private bool EnsureConnectedSafe()
+        {
+            try
+            {
+                EnsureConnected();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"SFTP connection error: {ex.Message}");
+                return false;
+            }
+        }
+
 
         private async void Fsw_Changed(object? sender, FileSystemEventArgs arg)
         {
-            if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
-                || arg.ChangeType == WatcherChangeTypes.Renamed)
+            try
             {
-                var changedPath = Path.GetDirectoryName(arg.FullPath);
-                var relativePath = _localRootDirectory == changedPath ? "" : changedPath?.Substring(_localRootDirectory.Length).Replace('\\', '/');
-                var fullRemotePath = _remoteRootDirectory + relativePath;
-                await Task.Yield();
-                bool makeDirectory = true;
-                lock (_activeDirSync)
+                if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
+                    || arg.ChangeType == WatcherChangeTypes.Renamed)
                 {
-                    if (changedPath == null)
-                        return;
-                    if (_activeDirSync.Contains(changedPath))
-                        makeDirectory = false;
-                    else
-                        _activeDirSync.Add(changedPath);
-                }
-
-                //check if we're a new directory
-                if (makeDirectory && Directory.Exists(arg.FullPath) && !_sftp.Exists(arg.FullPath))
-                {
-                    _sftp.CreateDirectory(fullRemotePath);
-                }
-
-                if (makeDirectory)
-                {
+                    var changedPath = Path.GetDirectoryName(arg.FullPath);
+                    var relativePath = _localRootDirectory == changedPath ? "" : changedPath?.Substring(_localRootDirectory.Length).Replace('\\', '/');
+                    var fullRemotePath = _remoteRootDirectory + relativePath;
+                    await Task.Yield();
+                    bool makeDirectory = true;
                     lock (_activeDirSync)
                     {
-                        _activeDirSync.Remove(changedPath);
+                        if (changedPath == null)
+                            return;
+                        if (_activeDirSync.Contains(changedPath))
+                            makeDirectory = false;
+                        else
+                            _activeDirSync.Add(changedPath);
                     }
-                }
 
-                while (!IsFileReady(arg.FullPath))
-                    await Task.Delay(25);
+                    bool connectionOk;
+                    await _sftpLock.WaitAsync();
+                    try
+                    {
+                        connectionOk = EnsureConnectedSafe();
+                        if (connectionOk)
+                        {
+                            //check if we're a new directory
+                            if (makeDirectory && Directory.Exists(arg.FullPath) && !_sftp.Exists(fullRemotePath))
+                            {
+                                _sftp.CreateDirectory(fullRemotePath);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        _sftpLock.Release();
+                    }
 
-
-                lock (_activeDirSync)
-                {
-                    if (_activeDirSync.Contains(arg.FullPath))
+                    if (!connectionOk)
+                    {
+                        if (makeDirectory)
+                        {
+                            lock (_activeDirSync)
+                            {
+                                _activeDirSync.Remove(changedPath);
+                            }
+                        }
                         return;
-                    else
-                        _activeDirSync.Add(arg.FullPath);
-                }
-                SyncFile(_sftp, arg.FullPath, fullRemotePath + "/" + Path.GetFileName(arg.FullPath)   );
+                    }
 
-                lock (_activeDirSync)
-                {
-                    _activeDirSync.Remove(arg.FullPath);
+                    if (makeDirectory)
+                    {
+                        lock (_activeDirSync)
+                        {
+                            _activeDirSync.Remove(changedPath);
+                        }
+                    }
+
+                    if (Directory.Exists(arg.FullPath))
+                        return;
+
+                    var waitStart = DateTime.UtcNow;
+                    while (!IsFileReady(arg.FullPath))
+                    {
+                        if (!File.Exists(arg.FullPath))
+                            return;
+                        if (DateTime.UtcNow - waitStart > TimeSpan.FromSeconds(30))
+                        {
+                            Logger.LogWarnig($"Timed out waiting for file to be ready: {arg.FullPath}");
+                            return;
+                        }
+                        await Task.Delay(25);
+                    }
+
+                    lock (_activeDirSync)
+                    {
+                        if (_activeDirSync.Contains(arg.FullPath))
+                            return;
+                        else
+                            _activeDirSync.Add(arg.FullPath);
+                    }
+
+                    bool fileConnectionOk;
+                    await _sftpLock.WaitAsync();
+                    try
+                    {
+                        fileConnectionOk = EnsureConnectedSafe();
+                        if (fileConnectionOk)
+                        {
+                            SyncFile(_sftp, arg.FullPath, fullRemotePath + "/" + Path.GetFileName(arg.FullPath));
+                        }
+                    }
+                    finally
+                    {
+                        _sftpLock.Release();
+                        lock (_activeDirSync)
+                        {
+                            _activeDirSync.Remove(arg.FullPath);
+                        }
+                    }
+
+                    if (!fileConnectionOk)
+                        return;
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unhandled exception in file sync handler: {ex.Message}");
             }
         }
 
@@ -315,6 +408,7 @@ namespace SFTPSyncLib
         {
             if (_sftp != null)
             {
+                _disposed = true;
                 _sftp.Dispose();
             }
         }

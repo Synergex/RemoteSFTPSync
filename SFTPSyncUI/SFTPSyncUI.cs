@@ -27,6 +27,23 @@ namespace SFTPSyncUI
             if (processPath != null)
                 ExecutableFile = Path.ChangeExtension(processPath, ".exe");
 
+            Application.ThreadException += (sender, args) =>
+            {
+                Logger.LogError($"Unhandled UI exception: {args.Exception.Message}");
+            };
+            AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
+            {
+                if (args.ExceptionObject is Exception ex)
+                    Logger.LogError($"Unhandled exception: {ex.Message}");
+                else
+                    Logger.LogError("Unhandled exception: unknown error");
+            };
+            TaskScheduler.UnobservedTaskException += (sender, args) =>
+            {
+                Logger.LogError($"Unobserved task exception: {args.Exception.Message}");
+                args.SetObserved();
+            };
+
             // Check if another instance is already running and if so, tell it to show its window, then exit
             bool createdNew;
             Mutex mutex = new Mutex(true, $"Global\\SFTPSyncUI", out createdNew);
