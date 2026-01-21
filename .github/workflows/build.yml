@@ -41,7 +41,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output SFTPSync/bin/Release/net8.0-windows/publish/win-x64/ `
+          --output SFTPSync/bin/Release/net8.0-windows `
           /p:PublishSingleFile=true `
           /p:PublishReadyToRun=true
 
@@ -51,7 +51,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output SFTPSyncStop/bin/Release/net8.0-windows/publish/win-x64/ `
+          --output SFTPSyncStop/bin/Release/net8.0-windows `
           /p:PublishSingleFile=true `
           /p:PublishReadyToRun=true
 
@@ -61,7 +61,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output SFTPSyncUI/bin/Release/net8.0-windows/publish/win-x64/ `
+          --output SFTPSyncUI/bin/Release/net8.0-windows `
           /p:PublishSingleFile=true `
           /p:PublishReadyToRun=true
 
@@ -75,26 +75,52 @@ jobs:
         AZURE_CERT_NAME: ${{ secrets.AZURE_CERT_NAME }}
       shell: pwsh
       run: |
-        $publishDirs = @("SFTPSync/bin/Release/net8.0-windows/publish/win-x64", "SFTPSyncStop/bin/Release/net8.0-windows/publish/win-x64", "SFTPSyncUI/bin/Release/net8.0-windows/publish/win-x64")
-        foreach ($dir in $publishDirs) {
-          if (Test-Path $dir) {
-            $files = Get-ChildItem -Path $dir -Include *.exe, *.dll -Recurse
-            foreach ($file in $files) {
-              Write-Host "Signing $($file.FullName)"
-              AzureSignTool sign `
-                -kvu $env:AZURE_KEY_VAULT_URL `
-                -kvi $env:AZURE_APPLICATION_ID `
-                -kvs $env:AZURE_CLIENT_SECRET `
-                -kvt $env:AZURE_TENANT_ID `
-                -kvc $env:AZURE_CERT_NAME `
-                -tr http://timestamp.digicert.com `
-                -fd sha256 `
-                -td sha256 `
-                $file.FullName
-            }
-          } else {
-            Write-Host "Directory $dir not found"
+        $solutionPath = "SFTPSync.sln"
+        $projectPaths = @()
+        $projectMatches = Select-String -Path $solutionPath -Pattern 'Project\(\".*\"\)\s=\s\".*\",\s\"(?<path>[^\"]+\.csproj)\"'
+        foreach ($match in $projectMatches) {
+          $projectPaths += $match.Matches[0].Groups["path"].Value
+        }
+
+        $targets = @()
+        foreach ($projectPath in $projectPaths) {
+          if (!(Test-Path $projectPath)) {
+            Write-Host "Project not found: $projectPath"
+            continue
           }
+
+          [xml]$projXml = Get-Content $projectPath
+          $assemblyName = ($projXml.Project.PropertyGroup | Where-Object { $_.AssemblyName } | Select-Object -First 1).AssemblyName
+          if ([string]::IsNullOrWhiteSpace($assemblyName)) {
+            $assemblyName = [System.IO.Path]::GetFileNameWithoutExtension($projectPath)
+          }
+
+          $outputType = ($projXml.Project.PropertyGroup | Where-Object { $_.OutputType } | Select-Object -First 1).OutputType
+          $extension = if ($outputType -in @("Exe", "WinExe")) { ".exe" } else { ".dll" }
+
+          $projectDir = Split-Path $projectPath -Parent
+          $releaseDir = Join-Path $projectDir "bin/Release"
+          if (!(Test-Path $releaseDir)) {
+            Write-Host "Release output not found: $releaseDir"
+            continue
+          }
+
+          $targets += Get-ChildItem -Path $releaseDir -Recurse -Filter "$assemblyName$extension"
+        }
+
+        $targets = $targets | Sort-Object -Property FullName -Unique
+        foreach ($file in $targets) {
+          Write-Host "Signing $($file.FullName)"
+          AzureSignTool sign `
+            -kvu $env:AZURE_KEY_VAULT_URL `
+            -kvi $env:AZURE_APPLICATION_ID `
+            -kvs $env:AZURE_CLIENT_SECRET `
+            -kvt $env:AZURE_TENANT_ID `
+            -kvc $env:AZURE_CERT_NAME `
+            -tr http://timestamp.digicert.com `
+            -fd sha256 `
+            -td sha256 `
+            $file.FullName
         }
 
     - name: Add WiX Toolset to PATH

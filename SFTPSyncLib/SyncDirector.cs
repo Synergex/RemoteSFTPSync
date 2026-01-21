@@ -13,12 +13,15 @@ namespace SFTPSyncLib
             _fsw = new FileSystemWatcher(rootFolder, "*.*")
             {
                 IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
+                // Max allowed size; helps reduce missed events during bursts.
+                InternalBufferSize = 64 * 1024
             };
 
             _fsw.Changed += Fsw_Changed;
             _fsw.Created += Fsw_Created;
             _fsw.Renamed += Fsw_Renamed;
+            _fsw.Error += Fsw_Error;
 
             _fsw.EnableRaisingEvents = true;
         }
@@ -60,6 +63,11 @@ namespace SFTPSyncLib
                     callback(e);
                 }
             }
+        }
+
+        private void Fsw_Error(object sender, ErrorEventArgs e)
+        {
+            Logger.LogError($"FileSystemWatcher error: {e.GetException()?.Message}");
         }
     }
 }
