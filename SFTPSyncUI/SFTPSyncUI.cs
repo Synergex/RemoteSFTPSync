@@ -264,7 +264,18 @@ namespace SFTPSyncUI
                         }
                     }
 
+                    var connectTasks = new List<Task>();
+
+                    Logger.LogInfo($"Establishing SFTP connections for {RemoteSyncWorkers.Count} workers");
+
+                    for (int i = 0; i < RemoteSyncWorkers.Count; i++)
+                    {
+                        connectTasks.Add(RemoteSyncWorkers[i].ConnectAsync());
+                    }
+                    await Task.WhenAll(connectTasks);
+
                     Task runInitialSyncTask;
+
                     try
                     {
                         runInitialSyncTask = RemoteSync.RunSharedInitialSyncAsync(
@@ -284,7 +295,7 @@ namespace SFTPSyncUI
                         return;
                     }
 
-                    runInitialSyncTask.ContinueWith(t =>
+                    await runInitialSyncTask.ContinueWith(t =>
                     {
                         if (t.IsFaulted && t.Exception != null)
                         {
@@ -301,6 +312,7 @@ namespace SFTPSyncUI
                     }, TaskScheduler.Default);
 
                     //Wait for all sync workers to finish initial sync then tell the user
+
                     try
                     {
                         await runInitialSyncTask;

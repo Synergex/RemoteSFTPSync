@@ -39,7 +39,6 @@ namespace SFTPSyncLib
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
             _sftp = new SftpClient(host, username, password);
-            _sftp.Connect();
 
             //Our first instance is responsible for creating all of the the directories
             //Subsequent instances will not be created until this is done
@@ -69,7 +68,6 @@ namespace SFTPSyncLib
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
             _sftp = new SftpClient(host, username, password);
-            _sftp.Connect();
 
             DoneMakingFolders = Task.CompletedTask;
             DoneInitialSync = initialSyncTask;
@@ -422,6 +420,11 @@ namespace SFTPSyncLib
                 Logger.LogError($"SFTP connection error: {ex.Message}");
                 return false;
             }
+        }
+
+        public Task<bool> ConnectAsync()
+        {
+            return Task.Run(() => EnsureConnectedSafe());
         }
 
 
