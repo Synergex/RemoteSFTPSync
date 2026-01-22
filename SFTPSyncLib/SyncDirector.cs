@@ -28,9 +28,10 @@ namespace SFTPSyncLib
 
         private void Fsw_Renamed(object sender, RenamedEventArgs e)
         {
+            var name = Path.GetFileName(e.FullPath);
             foreach (var (regex, callback) in callbacks)
             {
-                if (regex.IsMatch(e.FullPath))
+                if (regex.IsMatch(name))
                 {
                     callback(e);
                 }
@@ -39,9 +40,10 @@ namespace SFTPSyncLib
 
         private void Fsw_Created(object sender, FileSystemEventArgs e)
         {
+            var name = Path.GetFileName(e.FullPath);
             foreach (var (regex, callback) in callbacks)
             {
-                if (regex.IsMatch(e.FullPath))
+                if (regex.IsMatch(name))
                 {
                     callback(e);
                 }
@@ -58,9 +60,10 @@ namespace SFTPSyncLib
 
         private void Fsw_Changed(object sender, FileSystemEventArgs e)
         {
+            var name = Path.GetFileName(e.FullPath);
             foreach (var (regex, callback) in callbacks)
             {
-                if (regex.IsMatch(e.FullPath))
+                if (regex.IsMatch(name))
                 {
                     callback(e);
                 }

@@ -33,8 +33,8 @@ namespace SFTPSyncLib
             _username = username;
             _password = password;
             _searchPattern = searchPattern;
-            _localRootDirectory = Path.GetFullPath(localRootDirectory)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            _localRootDirectory = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(localRootDirectory));
             _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
@@ -63,8 +63,8 @@ namespace SFTPSyncLib
             _username = username;
             _password = password;
             _searchPattern = searchPattern;
-            _localRootDirectory = Path.GetFullPath(localRootDirectory)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            _localRootDirectory = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(localRootDirectory));
             _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
@@ -197,7 +197,7 @@ namespace SFTPSyncLib
         {
             if (new DirectoryInfo(sourcePath).EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly).Any())
             {
-                Logger.LogInfo($"Sync started for {sourcePath}\\{searchPattern} -> {destinationPath}");
+                Logger.LogInfo($"Sync started for {sourcePath}\\{searchPattern}");
 
                 return Task<IEnumerable<FileInfo>>.Factory.FromAsync(sftp.BeginSynchronizeDirectories,
                                                    sftp.EndSynchronizeDirectories, sourcePath,
@@ -339,6 +339,7 @@ namespace SFTPSyncLib
                 var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
                 if (!remoteDirectories.ContainsKey(directoryName))
                 {
+                    Logger.LogInfo($"Creating remote directory {remotePath}{directoryName}");
                     sftp.CreateDirectory(remotePath + "/" + directoryName);
                 }
                 await CreateDirectoriesInternal(sftp, localRootDirectory, localPath + "\\" + directoryName, remotePath + "/" + directoryName, excludedFolders);
