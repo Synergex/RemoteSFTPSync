@@ -50,8 +50,10 @@ namespace SFTPSyncLib
 
         public void AddCallback(string match, Action<FileSystemEventArgs> handler)
         {
-            string regexPattern = "^" + Regex.Escape(match).Replace("\\*", ".*") + "$";
-            callbacks.Add((new Regex(regexPattern), handler));
+            string regexPattern = "^" + Regex.Escape(match)
+                .Replace("\\*", ".*")
+                .Replace("\\?", ".") + "$";
+            callbacks.Add((new Regex(regexPattern, RegexOptions.IgnoreCase), handler));
         }
 
         private void Fsw_Changed(object sender, FileSystemEventArgs e)
