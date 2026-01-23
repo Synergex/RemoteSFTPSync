@@ -50,12 +50,8 @@ namespace SFTPSyncLib
 
             DoneInitialSync = InitialSync(_localRootDirectory, _remoteRootDirectory);
 
-            //Once the initial sync is done, we can start watching the file system for changes
-
-            DoneInitialSync.ContinueWith((tmp) =>
-            {
-                _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
-            });
+            // Register callbacks immediately; handler will ignore events until initial sync completes.
+            _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
         }
 
         public RemoteSync(string host, string username, string password,
@@ -76,10 +72,8 @@ namespace SFTPSyncLib
 
             DoneInitialSync = initialSyncTask;
 
-            DoneInitialSync.ContinueWith((tmp) =>
-            {
-                _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
-            });
+            // Register callbacks immediately; handler will ignore events until initial sync completes.
+            _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
         }
 
         public static async Task RunSharedInitialSyncAsync(
@@ -433,6 +427,9 @@ namespace SFTPSyncLib
         {
             try
             {
+                if (!DoneInitialSync.IsCompleted)
+                    return;
+
                 if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
                     || arg.ChangeType == WatcherChangeTypes.Renamed)
                 {
