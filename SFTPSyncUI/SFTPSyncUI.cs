@@ -223,7 +223,7 @@ namespace SFTPSyncUI
             {
                 await Task.Run(async () =>
                 {
-                    var director = new SyncDirector(capturedSettings.LocalPath);
+                    var director = new SyncDirector(capturedSettings.LocalPath, capturedSettings.DeleteEnabled);
 
                     var patterns = capturedSettings.LocalSearchPattern
                         .Split(';', StringSplitOptions.RemoveEmptyEntries)
@@ -254,7 +254,9 @@ namespace SFTPSyncUI
                                 pattern,
                                 director,
                                 capturedSettings.ExcludedDirectories,
-                                initialSyncTask));
+                                initialSyncTask,
+                                capturedSettings.DeleteEnabled,
+                                RemoteSyncWorkers.Count == 0));
 
                             Logger.LogInfo($"Started sync worker {RemoteSyncWorkers.Count} for pattern {pattern}");
                         }

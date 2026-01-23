@@ -13,6 +13,7 @@ namespace SFTPSyncLib
         string _localRootDirectory;
         string _remoteRootDirectory;
         readonly List<string>? _excludedFolders;
+        readonly bool _deleteEnabled;
 
         SftpClient _sftp;
         SyncDirector _director;
@@ -27,7 +28,7 @@ namespace SFTPSyncLib
 
         public RemoteSync(string host, string username, string password,
             string localRootDirectory, string remoteRootDirectory, 
-            string searchPattern, bool createFolders, SyncDirector director, List<string>? excludedFolders)
+            string searchPattern, bool createFolders, SyncDirector director, List<string>? excludedFolders, bool deleteEnabled, bool handleDirectoryDeletes)
         {
             _host = host;
             _username = username;
@@ -37,6 +38,7 @@ namespace SFTPSyncLib
             _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
+            _deleteEnabled = deleteEnabled;
             _sftp = new SftpClient(host, username, password);
 
             //The first instance is responsible for creating ALL of the the directories.
@@ -52,11 +54,15 @@ namespace SFTPSyncLib
 
             // Register callbacks immediately; handler will ignore events until initial sync completes.
             _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
+            if (deleteEnabled && handleDirectoryDeletes)
+            {
+                _director.AddDirectoryDeleteCallback((args) => Fsw_DirectoryDeleted(null, args));
+            }
         }
 
         public RemoteSync(string host, string username, string password,
             string localRootDirectory, string remoteRootDirectory,
-            string searchPattern, SyncDirector director, List<string>? excludedFolders, Task initialSyncTask)
+            string searchPattern, SyncDirector director, List<string>? excludedFolders, Task initialSyncTask, bool deleteEnabled, bool handleDirectoryDeletes)
         {
             _host = host;
             _username = username;
@@ -66,6 +72,7 @@ namespace SFTPSyncLib
             _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
+            _deleteEnabled = deleteEnabled;
             _sftp = new SftpClient(host, username, password);
 
             DoneMakingFolders = Task.CompletedTask;
@@ -74,6 +81,10 @@ namespace SFTPSyncLib
 
             // Register callbacks immediately; handler will ignore events until initial sync completes.
             _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
+            if (deleteEnabled && handleDirectoryDeletes)
+            {
+                _director.AddDirectoryDeleteCallback((args) => Fsw_DirectoryDeleted(null, args));
+            }
         }
 
         public static async Task RunSharedInitialSyncAsync(
@@ -430,6 +441,12 @@ namespace SFTPSyncLib
                 if (!DoneInitialSync.IsCompleted)
                     return;
 
+                if (_deleteEnabled && arg.ChangeType == WatcherChangeTypes.Deleted)
+                {
+                    await SyncFileDeleteAsync(arg);
+                    return;
+                }
+
                 if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
                     || arg.ChangeType == WatcherChangeTypes.Renamed)
                 {
@@ -540,6 +557,65 @@ namespace SFTPSyncLib
             }
         }
 
+        private async void Fsw_DirectoryDeleted(object? sender, FileSystemEventArgs arg)
+        {
+            try
+            {
+                if (!DoneInitialSync.IsCompleted)
+                    return;
+
+                var remotePath = GetRemotePathForLocal(arg.FullPath);
+                await _sftpLock.WaitAsync();
+                try
+                {
+                    if (EnsureConnectedSafe())
+                    {
+                        DeleteRemotePathRecursive(_sftp, remotePath);
+                    }
+                }
+                finally
+                {
+                    _sftpLock.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unhandled exception in directory delete handler: {ex.Message}");
+            }
+        }
+
+        private async Task SyncFileDeleteAsync(FileSystemEventArgs arg)
+        {
+            var remotePath = GetRemotePathForLocal(arg.FullPath);
+
+            await _sftpLock.WaitAsync();
+
+            try
+            {
+                if (!EnsureConnectedSafe())
+                    return;
+
+                if (_sftp.Exists(remotePath))
+                {
+                    var attributes = _sftp.GetAttributes(remotePath);
+
+                    if (!attributes.IsDirectory)
+                    {
+                        Logger.LogInfo($"Syncing delete {arg.FullPath}");
+                        _sftp.DeleteFile(remotePath);
+                    }
+                }
+                else
+                {
+                    Logger.LogWarnig($"Syncing delete {remotePath} not found");
+                }
+            }
+            finally
+            {
+                _sftpLock.Release();
+            }
+        }
+
         public void Dispose()
         {
             if (_sftp != null)
@@ -561,6 +637,41 @@ namespace SFTPSyncLib
             public string LocalPath { get; }
             public string RemotePath { get; }
             public string SearchPattern { get; }
+        }
+
+        private static void DeleteRemotePathRecursive(SftpClient sftp, string remotePath)
+        {
+            if (!sftp.Exists(remotePath))
+            {
+                var vmsDirectoryPath = remotePath + ".DIR";
+                if (!sftp.Exists(vmsDirectoryPath))
+                    return;
+                remotePath = vmsDirectoryPath;
+            }
+
+            var attributes = sftp.GetAttributes(remotePath);
+            if (!attributes.IsDirectory)
+            {
+                sftp.DeleteFile(remotePath);
+                return;
+            }
+
+            foreach (var entry in sftp.ListDirectory(remotePath))
+            {
+                if (entry.Name == "." || entry.Name == "..")
+                    continue;
+
+                if (entry.IsDirectory)
+                {
+                    DeleteRemotePathRecursive(sftp, entry.FullName);
+                }
+                else
+                {
+                    sftp.DeleteFile(entry.FullName);
+                }
+            }
+
+            sftp.DeleteDirectory(remotePath);
         }
     }
 }
