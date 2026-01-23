@@ -40,11 +40,11 @@ namespace SFTPSyncLib
             switch (_mode)
             {
                 case LoggerMode.Console:
-                    Console.WriteLine($"{DateTime.Now.ToString()} {message}");
+                    Console.WriteLine($"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")} {message}");
                     break;
 
                 case LoggerMode.RaiseEvent:
-                    LogUpdated?.Invoke($"{DateTime.Now.ToString()} {message}");
+                    LogUpdated?.Invoke($"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")} {message}");
                     break;
             }
         }

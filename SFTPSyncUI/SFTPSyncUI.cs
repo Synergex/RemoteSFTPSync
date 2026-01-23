@@ -210,76 +210,130 @@ namespace SFTPSyncUI
             Logger.LogInfo("Starting sync workers...");
             mainForm?.SetStatusBarText("Performing initial sync...");
 
-            var director = new SyncDirector(settings.LocalPath);
-
-            var patterns = settings.LocalSearchPattern
-                .Split(';', StringSplitOptions.RemoveEmptyEntries)
-                .Select(pattern => pattern.Trim())
-                .Where(pattern => pattern.Length > 0)
-                .ToArray();
-
-            if (patterns.Length == 0)
+            var capturedSettings = settings;
+            var capturedMainForm = mainForm;
+            var setStatus = (string text) =>
             {
-                Logger.LogError("No valid search patterns were configured.");
-                return;
-            }
+                if (capturedMainForm == null)
+                    return;
+                capturedMainForm.BeginInvoke((Action)(() => capturedMainForm.SetStatusBarText(text)));
+            };
 
-            Task initialSyncTask;
             try
             {
-                initialSyncTask = RemoteSync.RunSharedInitialSyncAsync(
-                    settings.RemoteHost,
-                    settings.RemoteUsername,
-                    DPAPIEncryption.Decrypt(settings.RemotePassword),
-                    settings.LocalPath,
-                    settings.RemotePath,
-                    patterns,
-                    settings.ExcludedDirectories,
-                    patterns.Length);
+                await Task.Run(async () =>
+                {
+                    var director = new SyncDirector(capturedSettings.LocalPath);
+
+                    var patterns = capturedSettings.LocalSearchPattern
+                        .Split(';', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(pattern => pattern.Trim())
+                        .Where(pattern => pattern.Length > 0)
+                        .ToArray();
+
+                    if (patterns.Length == 0)
+                    {
+                        Logger.LogError("No valid search patterns were configured.");
+                        setStatus("Invalid search patterns");
+                        return;
+                    }
+
+                    var initialSyncTcs = new TaskCompletionSource<object?>();
+                    var initialSyncTask = initialSyncTcs.Task;
+
+                    foreach (var pattern in patterns)
+                    {
+                        try
+                        {
+                            RemoteSyncWorkers.Add(new RemoteSync(
+                                capturedSettings.RemoteHost,
+                                capturedSettings.RemoteUsername,
+                                DPAPIEncryption.Decrypt(capturedSettings.RemotePassword),
+                                capturedSettings.LocalPath,
+                                capturedSettings.RemotePath,
+                                pattern,
+                                director,
+                                capturedSettings.ExcludedDirectories,
+                                initialSyncTask));
+
+                            Logger.LogInfo($"Started sync worker {RemoteSyncWorkers.Count} for pattern {pattern}");
+                        }
+                        catch (Exception)
+                        {
+                            Logger.LogError($"Failed to start sync worker for pattern {pattern}");
+                        }
+                    }
+
+                    var connectTasks = new List<Task>();
+
+                    Logger.LogInfo($"Establishing SFTP connections for {RemoteSyncWorkers.Count} workers");
+
+                    for (int i = 0; i < RemoteSyncWorkers.Count; i++)
+                    {
+                        connectTasks.Add(RemoteSyncWorkers[i].ConnectAsync());
+                    }
+                    await Task.WhenAll(connectTasks);
+
+                    Task runInitialSyncTask;
+
+                    try
+                    {
+                        runInitialSyncTask = RemoteSync.RunSharedInitialSyncAsync(
+                            capturedSettings.RemoteHost,
+                            capturedSettings.RemoteUsername,
+                            DPAPIEncryption.Decrypt(capturedSettings.RemotePassword),
+                            capturedSettings.LocalPath,
+                            capturedSettings.RemotePath,
+                            patterns,
+                            capturedSettings.ExcludedDirectories,
+                            patterns.Length);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Failed to start initial sync. Exception: {ex.Message}");
+                        setStatus("Initial sync failed");
+                        return;
+                    }
+
+                    await runInitialSyncTask.ContinueWith(t =>
+                    {
+                        if (t.IsFaulted && t.Exception != null)
+                        {
+                            initialSyncTcs.TrySetException(t.Exception.InnerExceptions);
+                        }
+                        else if (t.IsCanceled)
+                        {
+                            initialSyncTcs.TrySetCanceled();
+                        }
+                        else
+                        {
+                            initialSyncTcs.TrySetResult(null);
+                        }
+                    }, TaskScheduler.Default);
+
+                    //Wait for all sync workers to finish initial sync then tell the user
+
+                    try
+                    {
+                        await runInitialSyncTask;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Initial sync failed. Exception: {ex.Message}");
+                        setStatus("Initial sync failed");
+                        return;
+                    }
+
+                    Logger.LogInfo("Initial sync complete, real-time sync active");
+                    setStatus("Real time sync active");
+                });
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to start initial sync. Exception: {ex.Message}");
+                Logger.LogError($"Failed to start sync. Exception: {ex.Message}");
+                mainForm?.SetStatusBarText("Sync failed");
                 return;
             }
-
-            foreach (var pattern in patterns)
-            {
-                try
-                {
-                    RemoteSyncWorkers.Add(new RemoteSync(
-                        settings.RemoteHost,
-                        settings.RemoteUsername,
-                        DPAPIEncryption.Decrypt(settings.RemotePassword),
-                        settings.LocalPath,
-                        settings.RemotePath,
-                        pattern,
-                        director,
-                        settings.ExcludedDirectories,
-                        initialSyncTask));
-
-                    Logger.LogInfo($"Started sync worker {RemoteSyncWorkers.Count} for pattern {pattern}");
-                }
-                catch (Exception)
-                {
-                    Logger.LogError($"Failed to start sync worker for pattern {pattern}");
-                }
-            }
-
-            //Wait for all sync workers to finish initial sync then tell the user
-            try
-            {
-                await initialSyncTask;
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Initial sync failed. Exception: {ex.Message}");
-                mainForm?.SetStatusBarText("Initial sync failed");
-                return;
-            }
-
-            Logger.LogInfo("Initial sync complete, real-time sync active");
-            mainForm?.SetStatusBarText("Real time sync active");
         }
 
         /// <summary>

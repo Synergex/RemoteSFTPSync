@@ -159,15 +159,15 @@ namespace SFTPSyncUI
 
         private void AddMessage(string message)
         {
-            listBoxMessages.Items.Add(message);
+            listBoxMessages.Items.Insert(0, message);
 
-            // Optional: auto-scroll to bottom
-            listBoxMessages.TopIndex = listBoxMessages.Items.Count - 1;
+            // Keep newest at top
+            listBoxMessages.TopIndex = 0;
 
             // Optional: trim excess from UI if _log did a dequeue
             if (listBoxMessages.Items.Count > 1000)
             {
-                listBoxMessages.Items.RemoveAt(0);
+                listBoxMessages.Items.RemoveAt(listBoxMessages.Items.Count - 1);
             }
         }
 
