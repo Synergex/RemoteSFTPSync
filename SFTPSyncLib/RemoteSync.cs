@@ -33,21 +33,25 @@ namespace SFTPSyncLib
             _username = username;
             _password = password;
             _searchPattern = searchPattern;
-            _localRootDirectory = Path.TrimEndingDirectorySeparator(
-                Path.GetFullPath(localRootDirectory));
+            _localRootDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(localRootDirectory));
             _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
             _sftp = new SftpClient(host, username, password);
 
-            //Our first instance is responsible for creating all of the the directories
-            //Subsequent instances will not be created until this is done
-            DoneMakingFolders = createFolders ? CreateDirectories(_localRootDirectory, _remoteRootDirectory) : Task.CompletedTask;
+            //The first instance is responsible for creating ALL of the the directories.
+            //Subsequent instances will not be created until this one completes.
+
+            DoneMakingFolders = createFolders
+                ? CreateDirectories(_localRootDirectory, _remoteRootDirectory)
+                : Task.CompletedTask;
 
             //Now perform the initial sync for the pattern this instance is responsible for
+
             DoneInitialSync = InitialSync(_localRootDirectory, _remoteRootDirectory);
 
             //Once the initial sync is done, we can start watching the file system for changes
+
             DoneInitialSync.ContinueWith((tmp) =>
             {
                 _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
@@ -62,14 +66,14 @@ namespace SFTPSyncLib
             _username = username;
             _password = password;
             _searchPattern = searchPattern;
-            _localRootDirectory = Path.TrimEndingDirectorySeparator(
-                Path.GetFullPath(localRootDirectory));
+            _localRootDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(localRootDirectory));
             _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
             _sftp = new SftpClient(host, username, password);
 
             DoneMakingFolders = Task.CompletedTask;
+
             DoneInitialSync = initialSyncTask;
 
             DoneInitialSync.ContinueWith((tmp) =>
@@ -79,14 +83,9 @@ namespace SFTPSyncLib
         }
 
         public static async Task RunSharedInitialSyncAsync(
-            string host,
-            string username,
-            string password,
-            string localRootDirectory,
-            string remoteRootDirectory,
-            string[] searchPatterns,
-            List<string>? excludedFolders,
-            int workerCount)
+            string host, string username, string password,
+            string localRootDirectory, string remoteRootDirectory,
+            string[] searchPatterns, List<string>? excludedFolders, int workerCount)
         {
             if (workerCount <= 0 || searchPatterns.Length == 0)
             {
@@ -108,6 +107,7 @@ namespace SFTPSyncLib
             }
 
             var workQueue = new ConcurrentQueue<SyncWorkItem>();
+
             foreach (var pair in EnumerateLocalDirectories(localRootDirectory, remoteRootDirectory, excludedFolders))
             {
                 foreach (var pattern in searchPatterns)
@@ -117,6 +117,7 @@ namespace SFTPSyncLib
             }
 
             var workers = new List<Task>();
+
             for (int i = 0; i < workerCount; i++)
             {
                 workers.Add(Task.Run(async () =>

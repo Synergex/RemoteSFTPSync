@@ -18,24 +18,20 @@ namespace SFTPSyncLib
                 InternalBufferSize = 64 * 1024
             };
 
-            _fsw.Changed += Fsw_Changed;
             _fsw.Created += Fsw_Created;
+            _fsw.Changed += Fsw_Changed;
             _fsw.Renamed += Fsw_Renamed;
             _fsw.Error += Fsw_Error;
 
             _fsw.EnableRaisingEvents = true;
         }
 
-        private void Fsw_Renamed(object sender, RenamedEventArgs e)
+        public void AddCallback(string match, Action<FileSystemEventArgs> handler)
         {
-            var name = Path.GetFileName(e.FullPath);
-            foreach (var (regex, callback) in callbacks)
-            {
-                if (regex.IsMatch(name))
-                {
-                    callback(e);
-                }
-            }
+            string regexPattern = "^" + Regex.Escape(match)
+                .Replace("\\*", ".*")
+                .Replace("\\?", ".") + "$";
+            callbacks.Add((new Regex(regexPattern, RegexOptions.IgnoreCase), handler));
         }
 
         private void Fsw_Created(object sender, FileSystemEventArgs e)
@@ -50,15 +46,19 @@ namespace SFTPSyncLib
             }
         }
 
-        public void AddCallback(string match, Action<FileSystemEventArgs> handler)
+        private void Fsw_Changed(object sender, FileSystemEventArgs e)
         {
-            string regexPattern = "^" + Regex.Escape(match)
-                .Replace("\\*", ".*")
-                .Replace("\\?", ".") + "$";
-            callbacks.Add((new Regex(regexPattern, RegexOptions.IgnoreCase), handler));
+            var name = Path.GetFileName(e.FullPath);
+            foreach (var (regex, callback) in callbacks)
+            {
+                if (regex.IsMatch(name))
+                {
+                    callback(e);
+                }
+            }
         }
 
-        private void Fsw_Changed(object sender, FileSystemEventArgs e)
+        private void Fsw_Renamed(object sender, RenamedEventArgs e)
         {
             var name = Path.GetFileName(e.FullPath);
             foreach (var (regex, callback) in callbacks)
