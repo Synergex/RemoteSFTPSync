@@ -73,8 +73,8 @@ namespace SFTPSyncUI
             };
 
             //Set the initial window visibility
-            ShowInTaskbar = _settings.StartInTray;
             WindowState = _settings.StartInTray ? FormWindowState.Minimized : FormWindowState.Normal;
+            ShowInTaskbar = WindowState != FormWindowState.Minimized;
 
             // Can we and should we start the sync process now?
             if (checkCanStartSync() && _settings.AutoStartSync)
@@ -258,6 +258,12 @@ namespace SFTPSyncUI
                 Hide();
                 ShowInTaskbar = false;
             }
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            ShowInTaskbar = WindowState != FormWindowState.Minimized && Visible;
         }
 
         public void SetStatusBarText(string text)

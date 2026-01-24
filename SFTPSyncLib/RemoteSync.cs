@@ -585,6 +585,7 @@ namespace SFTPSyncLib
                 {
                     if (EnsureConnectedSafe())
                     {
+                        Logger.LogInfo($"Deleting directory {remotePath}");
                         DeleteRemotePathRecursive(_sftp, remotePath);
                     }
                 }
