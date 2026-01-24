@@ -210,6 +210,10 @@ namespace SFTPSyncUI
             Logger.LogInfo("Starting sync workers...");
             mainForm?.SetStatusBarText("Performing initial sync...");
 
+            Logger.LogInfo("Sample info message");
+            Logger.LogWarnig("Sample warning message");
+            Logger.LogError("Sample error message");
+
             var capturedSettings = settings;
             var capturedMainForm = mainForm;
             var setStatus = (string text) =>

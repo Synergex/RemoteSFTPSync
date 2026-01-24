@@ -3,6 +3,7 @@ using Renci.SshNet;
 using SFTPSyncLib;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Windows.Forms;
 
 namespace SFTPSyncUI
 {
@@ -273,12 +274,43 @@ namespace SFTPSyncUI
 
         private void mnuToolsOptions_Click(object sender, EventArgs e)
         {
-            var dialog = new SettingsForm(_settings,syncRunning);
+            var dialog = new SettingsForm(_settings, syncRunning);
             dialog.ShowDialog(this);
 
             if (!syncRunning)
                 checkCanStartSync();
 
+        }
+
+        private void ListBoxMessages_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || e.Font == null)
+                return;
+
+            string? itemText = listBoxMessages.Items[e.Index].ToString();
+
+            if (itemText == null)
+                return;
+
+            Color textColor = Color.Black;
+
+            if (itemText.Contains(" ERR: "))
+                textColor = Color.Red;
+            else if (itemText.Contains(" WRN: "))
+                textColor = Color.Orange;
+
+            e.DrawBackground();
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                itemText,
+                e.Font,
+                e.Bounds,
+                textColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter
+            );
+
+            e.DrawFocusRectangle();
         }
     }
 }

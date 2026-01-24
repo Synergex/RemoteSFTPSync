@@ -8,6 +8,8 @@ namespace SFTPSyncLib
         FileSystemWatcher _fsw;
         List<(Regex, Action<FileSystemEventArgs>)> callbacks = new List<(Regex, Action<FileSystemEventArgs>)>();
         readonly List<Action<FileSystemEventArgs>> directoryDeleteCallbacks = new List<Action<FileSystemEventArgs>>();
+        readonly List<Action<FileSystemEventArgs>> directoryCreateCallbacks = new List<Action<FileSystemEventArgs>>();
+        readonly List<Action<RenamedEventArgs>> directoryRenameCallbacks = new List<Action<RenamedEventArgs>>();
         readonly HashSet<string> knownDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         readonly object directoryLock = new object();
         readonly bool deleteEnabled;
@@ -53,9 +55,30 @@ namespace SFTPSyncLib
             directoryDeleteCallbacks.Add(handler);
         }
 
+        public void AddDirectoryCreateCallback(Action<FileSystemEventArgs> handler)
+        {
+            directoryCreateCallbacks.Add(handler);
+        }
+
+        public void AddDirectoryRenameCallback(Action<RenamedEventArgs> handler)
+        {
+            directoryRenameCallbacks.Add(handler);
+        }
+
         private void Fsw_Created(object sender, FileSystemEventArgs e)
         {
-            TrackDirectoryIfPresent(e.FullPath);
+            if (deleteEnabled)
+            {
+                TrackDirectoryIfPresent(e.FullPath);
+            }
+
+            if (Directory.Exists(e.FullPath))
+            {
+                foreach (var callback in directoryCreateCallbacks)
+                {
+                    callback(e);
+                }
+            }
 
             var name = Path.GetFileName(e.FullPath);
             foreach (var (regex, callback) in callbacks)
@@ -81,7 +104,18 @@ namespace SFTPSyncLib
 
         private void Fsw_Renamed(object sender, RenamedEventArgs e)
         {
-            HandleRenameForDirectoryTracking(e.OldFullPath, e.FullPath);
+            if (deleteEnabled)
+            {
+                HandleRenameForDirectoryTracking(e.OldFullPath, e.FullPath);
+            }
+
+            if (Directory.Exists(e.FullPath))
+            {
+                foreach (var callback in directoryRenameCallbacks)
+                {
+                    callback(e);
+                }
+            }
 
             var name = Path.GetFileName(e.FullPath);
             foreach (var (regex, callback) in callbacks)
