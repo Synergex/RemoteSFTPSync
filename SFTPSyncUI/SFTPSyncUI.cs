@@ -12,7 +12,6 @@ namespace SFTPSyncUI
         public static string ExecutableFile = String.Empty;
 
         private static AppSettings? settings;
-
         private static MainForm? mainForm;
 
         private const string autoRunRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -196,36 +195,58 @@ namespace SFTPSyncUI
         }
 
         public static List<RemoteSync> RemoteSyncWorkers = new List<RemoteSync>();
+        private static SyncDirector? activeDirector;
+        private static Task? syncTask;
+        private static CancellationTokenSource? syncCts;
+
+        private static readonly object DirectorLock = new object();
+        private static readonly object SyncStateLock = new object();
+        private static readonly object RemoteSyncLock = new object();
 
         /// <summary>
-        /// 
+        /// Start syncing files between local and remote
         /// </summary>
         /// <param name="loggerAction"></param>
         public static async void StartSync(Action<string> loggerAction)
         {
+            // Make sure we have settings
             if (settings == null)
                 return;
 
             Logger.LogUpdated += loggerAction;
             Logger.LogInfo("Starting sync workers...");
-            mainForm?.SetStatusBarText("Performing initial sync...");
 
-            var capturedSettings = settings;
-            var capturedMainForm = mainForm;
-            var setStatus = (string text) =>
+            var setStatus = new Action<string>(status =>
             {
-                if (capturedMainForm == null)
-                    return;
-                capturedMainForm.BeginInvoke((Action)(() => capturedMainForm.SetStatusBarText(text)));
-            };
+                mainForm?.BeginInvoke((Action)(() => mainForm.SetStatusBarText(status)));
+            });
+
+            setStatus("Performing initial sync... DO NOT ALTER SYNCED FILES UNTIL COMPLETE");
+
+            CancellationToken token;
+
+            lock (SyncStateLock)
+            {
+                syncCts?.Cancel();
+                syncCts?.Dispose();
+                syncCts = new CancellationTokenSource();
+                token = syncCts.Token;
+            }
 
             try
             {
-                await Task.Run(async () =>
+                syncTask = Task.Run(async () =>
                 {
-                    var director = new SyncDirector(capturedSettings.LocalPath, capturedSettings.DeleteEnabled);
+                    if (token.IsCancellationRequested)
+                        return;
 
-                    var patterns = capturedSettings.LocalSearchPattern
+                    var director = new SyncDirector(settings.LocalPath, settings.DeleteEnabled);
+                    lock (DirectorLock)
+                    {
+                        activeDirector = director;
+                    }
+
+                    var patterns = settings.LocalSearchPattern
                         .Split(';', StringSplitOptions.RemoveEmptyEntries)
                         .Select(pattern => pattern.Trim())
                         .Where(pattern => pattern.Length > 0)
@@ -233,8 +254,11 @@ namespace SFTPSyncUI
 
                     if (patterns.Length == 0)
                     {
-                        Logger.LogError("No valid search patterns were configured.");
-                        setStatus("Invalid search patterns");
+                        if (!token.IsCancellationRequested)
+                        {
+                            Logger.LogError("No valid search patterns were configured.");
+                            setStatus("Invalid search patterns");
+                        }
                         return;
                     }
 
@@ -243,36 +267,56 @@ namespace SFTPSyncUI
 
                     foreach (var pattern in patterns)
                     {
+                        if (token.IsCancellationRequested)
+                            return;
+
                         try
                         {
-                            RemoteSyncWorkers.Add(new RemoteSync(
-                                capturedSettings.RemoteHost,
-                                capturedSettings.RemoteUsername,
-                                DPAPIEncryption.Decrypt(capturedSettings.RemotePassword),
-                                capturedSettings.LocalPath,
-                                capturedSettings.RemotePath,
-                                pattern,
-                                director,
-                                capturedSettings.ExcludedDirectories,
-                                initialSyncTask,
-                                capturedSettings.DeleteEnabled,
-                                RemoteSyncWorkers.Count == 0));
+                            int workerIndex;
+                            RemoteSync worker;
+                            lock (RemoteSyncLock)
+                            {
+                                workerIndex = RemoteSyncWorkers.Count;
+                                worker = new RemoteSync(
+                                    settings.RemoteHost,
+                                    settings.RemoteUsername,
+                                    DPAPIEncryption.Decrypt(settings.RemotePassword),
+                                    settings.LocalPath,
+                                    settings.RemotePath,
+                                    pattern,
+                                    director,
+                                    settings.ExcludedDirectories,
+                                    initialSyncTask,
+                                    settings.DeleteEnabled,
+                                    workerIndex == 0);
+                                RemoteSyncWorkers.Add(worker);
+                            }
 
-                            Logger.LogInfo($"Started sync worker {RemoteSyncWorkers.Count} for pattern {pattern}");
+                            Logger.LogInfo($"Started sync worker {workerIndex + 1} for pattern {pattern}");
                         }
                         catch (Exception)
                         {
-                            Logger.LogError($"Failed to start sync worker for pattern {pattern}");
+                            if (!token.IsCancellationRequested)
+                                Logger.LogError($"Failed to start sync worker for pattern {pattern}");
                         }
                     }
 
                     var connectTasks = new List<Task>();
 
-                    Logger.LogInfo($"Establishing SFTP connections for {RemoteSyncWorkers.Count} workers");
-
-                    for (int i = 0; i < RemoteSyncWorkers.Count; i++)
+                    RemoteSync[] workerSnapshot;
+                    lock (RemoteSyncLock)
                     {
-                        connectTasks.Add(RemoteSyncWorkers[i].ConnectAsync());
+                        workerSnapshot = RemoteSyncWorkers.ToArray();
+                    }
+
+                    if (token.IsCancellationRequested)
+                        return;
+
+                    Logger.LogInfo($"Establishing SFTP connections for {workerSnapshot.Length} workers");
+
+                    for (int i = 0; i < workerSnapshot.Length; i++)
+                    {
+                        connectTasks.Add(workerSnapshot[i].ConnectAsync());
                     }
                     await Task.WhenAll(connectTasks);
 
@@ -281,24 +325,33 @@ namespace SFTPSyncUI
                     try
                     {
                         runInitialSyncTask = RemoteSync.RunSharedInitialSyncAsync(
-                            capturedSettings.RemoteHost,
-                            capturedSettings.RemoteUsername,
-                            DPAPIEncryption.Decrypt(capturedSettings.RemotePassword),
-                            capturedSettings.LocalPath,
-                            capturedSettings.RemotePath,
+                            settings.RemoteHost,
+                            settings.RemoteUsername,
+                            DPAPIEncryption.Decrypt(settings.RemotePassword),
+                            settings.LocalPath,
+                            settings.RemotePath,
                             patterns,
-                            capturedSettings.ExcludedDirectories,
+                            settings.ExcludedDirectories,
                             patterns.Length);
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Failed to start initial sync. Exception: {ex.Message}");
-                        setStatus("Initial sync failed");
+                        if (!token.IsCancellationRequested)
+                        {
+                            Logger.LogError($"Failed to start initial sync. Exception: {ex.Message}");
+                            setStatus("Initial sync failed");
+                        }
                         return;
                     }
 
+                    if (token.IsCancellationRequested)
+                        return;
+
                     await runInitialSyncTask.ContinueWith(t =>
                     {
+                        if (token.IsCancellationRequested)
+                            return;
+
                         if (t.IsFaulted && t.Exception != null)
                         {
                             initialSyncTcs.TrySetException(t.Exception.InnerExceptions);
@@ -321,19 +374,30 @@ namespace SFTPSyncUI
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Initial sync failed. Exception: {ex.Message}");
-                        setStatus("Initial sync failed");
+                        if (!token.IsCancellationRequested)
+                        {
+                            Logger.LogError($"Initial sync failed. Exception: {ex.Message}");
+                            setStatus("Initial sync failed");
+                        }
                         return;
                     }
 
-                    Logger.LogInfo("Initial sync complete, real-time sync active");
-                    setStatus("Real time sync active");
+                    if (!token.IsCancellationRequested)
+                    {
+                        Logger.LogInfo("Initial sync complete, real-time sync active");
+                        setStatus("Sync active");
+                    }
                 });
+
+                await syncTask;
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to start sync. Exception: {ex.Message}");
-                mainForm?.SetStatusBarText("Sync failed");
+                if (!token.IsCancellationRequested)
+                {
+                    Logger.LogError($"Failed to start sync. Exception: {ex.Message}");
+                    setStatus("Sync failed");
+                }
                 return;
             }
         }
@@ -342,12 +406,32 @@ namespace SFTPSyncUI
         /// 
         /// </summary>
         /// <param name="loggerAction"></param>
-        public static void StopSync(Action<string> loggerAction)
+        public static async void StopSync(Action<string> loggerAction)
         {
-            Logger.LogInfo("Stopping sync...");
-            mainForm?.SetStatusBarText("Stopping sync...");
+            var setStatus = new Action<string>(status =>
+            {
+                mainForm?.BeginInvoke((Action)(() => mainForm.SetStatusBarText(status)));
+            });
 
-            foreach (var remoteSync in RemoteSyncWorkers)
+            setStatus("Stopping sync...");
+
+            lock (SyncStateLock)
+            {
+                syncCts?.Cancel();
+                syncCts?.Dispose();
+                syncCts = null;
+            }
+
+            Logger.LogUpdated -= loggerAction;
+
+            RemoteSync[] workerSnapshot;
+            lock (RemoteSyncLock)
+            {
+                workerSnapshot = RemoteSyncWorkers.ToArray();
+                RemoteSyncWorkers.Clear();
+            }
+
+            foreach (var remoteSync in workerSnapshot)
             {
                 try
                 {
@@ -356,12 +440,27 @@ namespace SFTPSyncUI
                 catch { /* Swallow any exceptions */ }
             }
 
-            RemoteSyncWorkers.Clear();
+            lock (DirectorLock)
+            {
+                activeDirector?.Dispose();
+                activeDirector = null;
+            }
 
-            Logger.LogUpdated -= loggerAction;
+            var task = syncTask;
+            if (task != null)
+            {
+                try
+                {
+                    await task;
+                }
+                catch
+                {
+                }
+            }
 
-            Logger.LogInfo("Sync stopped");
-            mainForm?.SetStatusBarText("Sync stopped");
+            loggerAction($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} INF: Sync stopped");
+
+            setStatus("Sync inactive");
         }
     }
 }

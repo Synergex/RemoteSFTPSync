@@ -14,6 +14,9 @@ namespace SFTPSyncLib
         string _remoteRootDirectory;
         readonly List<string>? _excludedFolders;
         readonly bool _deleteEnabled;
+        readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
+        readonly object _disposeLock = new object();
+        Task<bool>? _connectTask;
 
         SftpClient _sftp;
         SyncDirector _director;
@@ -445,7 +448,9 @@ namespace SFTPSyncLib
 
         public Task<bool> ConnectAsync()
         {
-            return Task.Run(() => EnsureConnectedSafe());
+            var task = Task.Run(() => EnsureConnectedSafe());
+            _connectTask = task;
+            return task;
         }
 
 
@@ -453,6 +458,9 @@ namespace SFTPSyncLib
         {
             try
             {
+                if (_shutdownCts.IsCancellationRequested)
+                    return;
+
                 if (!DoneInitialSync.IsCompleted)
                     return;
 
@@ -576,6 +584,9 @@ namespace SFTPSyncLib
         {
             try
             {
+                if (_shutdownCts.IsCancellationRequested)
+                    return;
+
                 if (!DoneInitialSync.IsCompleted)
                     return;
 
@@ -604,6 +615,9 @@ namespace SFTPSyncLib
         {
             try
             {
+                if (_shutdownCts.IsCancellationRequested)
+                    return;
+
                 if (!DoneInitialSync.IsCompleted)
                     return;
 
@@ -638,6 +652,9 @@ namespace SFTPSyncLib
         {
             try
             {
+                if (_shutdownCts.IsCancellationRequested)
+                    return;
+
                 if (!DoneInitialSync.IsCompleted)
                     return;
 
@@ -678,6 +695,9 @@ namespace SFTPSyncLib
 
         private async Task SyncFileDeleteAsync(FileSystemEventArgs arg)
         {
+            if (_shutdownCts.IsCancellationRequested)
+                return;
+
             var remotePath = GetRemotePathForLocal(arg.FullPath);
 
             await _sftpLock.WaitAsync();
@@ -710,9 +730,36 @@ namespace SFTPSyncLib
 
         public void Dispose()
         {
-            if (_sftp != null)
+            lock (_disposeLock)
             {
+                if (_disposed)
+                    return;
+
+                if (!_shutdownCts.IsCancellationRequested)
+                {
+                    _shutdownCts.Cancel();
+                }
+
+                var connectTask = _connectTask;
+                if (connectTask != null && !connectTask.IsCompleted)
+                {
+                    _ = connectTask.ContinueWith(_ => DisposeNow(), TaskScheduler.Default);
+                    return;
+                }
+
+                DisposeNow();
+            }
+        }
+
+        private void DisposeNow()
+        {
+            lock (_disposeLock)
+            {
+                if (_disposed)
+                    return;
+
                 _disposed = true;
+                _shutdownCts.Dispose();
                 _sftp.Dispose();
             }
         }

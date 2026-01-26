@@ -13,6 +13,7 @@ namespace SFTPSyncLib
         readonly HashSet<string> knownDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         readonly object directoryLock = new object();
         readonly bool deleteEnabled;
+        bool _disposed;
 
         public SyncDirector(string rootFolder, bool deleteEnabled = false)
         {
@@ -154,6 +155,16 @@ namespace SFTPSyncLib
         private void Fsw_Error(object sender, ErrorEventArgs e)
         {
             Logger.LogError($"FileSystemWatcher error: {e.GetException()?.Message}");
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            _fsw.EnableRaisingEvents = false;
+            _fsw.Dispose();
         }
 
         private void SeedKnownDirectories(string rootFolder)

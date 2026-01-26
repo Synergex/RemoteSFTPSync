@@ -76,9 +76,6 @@ namespace SFTPSyncUI
             WindowState = _settings.StartInTray ? FormWindowState.Minimized : FormWindowState.Normal;
             ShowInTaskbar = WindowState != FormWindowState.Minimized;
 
-            // Can we and should we start the sync process now?
-            if (checkCanStartSync() && _settings.AutoStartSync)
-                startSync();
         }
         private void mnuFileExit_Click(object sender, EventArgs e)
         {
@@ -226,8 +223,7 @@ namespace SFTPSyncUI
             if (!syncRunning)
             {
                 mnuFileStartSync.Enabled = false;
-                //TODO: Can't currently enable stop sync because it crashes the app
-                //mnuFileStopSync.Enabled = true; 
+                mnuFileStopSync.Enabled = true;
                 syncRunning = true;
                 SFTPSyncUI.StartSync(AppendLog);
             }
@@ -266,15 +262,24 @@ namespace SFTPSyncUI
             ShowInTaskbar = WindowState != FormWindowState.Minimized && Visible;
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+
+            // Auto-start after handle exists so BeginInvoke works even when minimized.
+            if (checkCanStartSync() && _settings.AutoStartSync)
+                startSync();
+        }
+
         public void SetStatusBarText(string text)
         {
             if (InvokeRequired)
             {
-                Invoke(new Action(() => StatusBar.Items[0].Text = text));
+                Invoke(new Action(() => Panel1.Text = text));
             }
             else
             {
-                StatusBar.Items[0].Text = text;
+                Panel1.Text = text;
             }
         }
 
