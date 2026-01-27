@@ -24,7 +24,7 @@ namespace SFTPSync
                     {
                         await remoteSyncWorkers[0].DoneMakingFolders;
                     }
-                    remoteSyncWorkers.Add(new RemoteSync(args[0], args[1], args[2], args[3], args[4], pattern, remoteSyncWorkers.Count == 0, director, null));
+                    remoteSyncWorkers.Add(new RemoteSync(args[0], args[1], args[2], args[3], args[4], pattern, remoteSyncWorkers.Count == 0, director, null, false, remoteSyncWorkers.Count == 0));
 
                     Logger.LogInfo($"Started sync worker {remoteSyncWorkers.Count} for pattern {pattern}");
                 }

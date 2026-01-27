@@ -3,6 +3,7 @@ using Renci.SshNet;
 using SFTPSyncLib;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Windows.Forms;
 
 namespace SFTPSyncUI
 {
@@ -72,12 +73,9 @@ namespace SFTPSyncUI
             };
 
             //Set the initial window visibility
-            ShowInTaskbar = _settings.StartInTray;
             WindowState = _settings.StartInTray ? FormWindowState.Minimized : FormWindowState.Normal;
+            ShowInTaskbar = WindowState != FormWindowState.Minimized;
 
-            // Can we and should we start the sync process now?
-            if (checkCanStartSync() && _settings.AutoStartSync)
-                startSync();
         }
         private void mnuFileExit_Click(object sender, EventArgs e)
         {
@@ -225,8 +223,7 @@ namespace SFTPSyncUI
             if (!syncRunning)
             {
                 mnuFileStartSync.Enabled = false;
-                //TODO: Can't currently enable stop sync because it crashes the app
-                //mnuFileStopSync.Enabled = true; 
+                mnuFileStopSync.Enabled = true;
                 syncRunning = true;
                 SFTPSyncUI.StartSync(AppendLog);
             }
@@ -259,26 +256,72 @@ namespace SFTPSyncUI
             }
         }
 
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            ShowInTaskbar = WindowState != FormWindowState.Minimized && Visible;
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+
+            // Auto-start after handle exists so BeginInvoke works even when minimized.
+            if (checkCanStartSync() && _settings.AutoStartSync)
+                startSync();
+        }
+
         public void SetStatusBarText(string text)
         {
             if (InvokeRequired)
             {
-                Invoke(new Action(() => StatusBar.Items[0].Text = text));
+                Invoke(new Action(() => Panel1.Text = text));
             }
             else
             {
-                StatusBar.Items[0].Text = text;
+                Panel1.Text = text;
             }
         }
 
         private void mnuToolsOptions_Click(object sender, EventArgs e)
         {
-            var dialog = new SettingsForm(_settings,syncRunning);
+            var dialog = new SettingsForm(_settings, syncRunning);
             dialog.ShowDialog(this);
 
             if (!syncRunning)
                 checkCanStartSync();
 
+        }
+
+        private void ListBoxMessages_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || e.Font == null)
+                return;
+
+            string? itemText = listBoxMessages.Items[e.Index].ToString();
+
+            if (itemText == null)
+                return;
+
+            Color textColor = Color.Black;
+
+            if (itemText.Contains(" ERR: "))
+                textColor = Color.Red;
+            else if (itemText.Contains(" WRN: "))
+                textColor = Color.Orange;
+
+            e.DrawBackground();
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                itemText,
+                e.Font,
+                e.Bounds,
+                textColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter
+            );
+
+            e.DrawFocusRectangle();
         }
     }
 }

@@ -2,6 +2,7 @@
 using Renci.SshNet;
 using SFTPSyncLib;
 using System.Diagnostics;
+using System.Security.Policy;
 using System.Text.RegularExpressions;
 
 namespace SFTPSyncUI
@@ -16,7 +17,7 @@ namespace SFTPSyncUI
         {
             InitializeComponent();
             _settings = settings;
-            _syncRunning = syncRunning; 
+            _syncRunning = syncRunning;
 
             //Load current settings.
             initialUiLoad = true;
@@ -34,6 +35,8 @@ namespace SFTPSyncUI
 
             textBoxRemotePath.Text = _settings.RemotePath;
             buttonVerifyAccess.Enabled = !_settings.AccessVerified;
+
+            chkSupportDelete.Checked = _settings.DeleteEnabled;
 
             //Application settings
             checkStartAtLogin.Checked = _settings.StartAtLogin;
@@ -253,6 +256,11 @@ namespace SFTPSyncUI
             if (!initialUiLoad)
                 _settings?.AutoStartSync = checkBoxAutoStartSync.Checked;
         }
+        private void chkSupportDelete_CheckedChanged(object sender, EventArgs e)
+        {
+            if (!initialUiLoad)
+                _settings?.DeleteEnabled = chkSupportDelete.Checked;
+        }
 
         private void checkBoxShowPassword_CheckedChanged(object sender, EventArgs e)
         {
@@ -304,6 +312,5 @@ namespace SFTPSyncUI
         {
             this.Close();
         }
-
     }
 }

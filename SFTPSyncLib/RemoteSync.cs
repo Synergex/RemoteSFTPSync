@@ -13,6 +13,10 @@ namespace SFTPSyncLib
         string _localRootDirectory;
         string _remoteRootDirectory;
         readonly List<string>? _excludedFolders;
+        readonly bool _deleteEnabled;
+        readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
+        readonly object _disposeLock = new object();
+        Task<bool>? _connectTask;
 
         SftpClient _sftp;
         SyncDirector _director;
@@ -27,7 +31,7 @@ namespace SFTPSyncLib
 
         public RemoteSync(string host, string username, string password,
             string localRootDirectory, string remoteRootDirectory, 
-            string searchPattern, bool createFolders, SyncDirector director, List<string>? excludedFolders)
+            string searchPattern, bool createFolders, SyncDirector director, List<string>? excludedFolders, bool deleteEnabled, bool handleDirectoryDeletes)
         {
             _host = host;
             _username = username;
@@ -37,6 +41,7 @@ namespace SFTPSyncLib
             _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
+            _deleteEnabled = deleteEnabled;
             _sftp = new SftpClient(host, username, password);
 
             //The first instance is responsible for creating ALL of the the directories.
@@ -52,11 +57,20 @@ namespace SFTPSyncLib
 
             // Register callbacks immediately; handler will ignore events until initial sync completes.
             _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
+            if (deleteEnabled && handleDirectoryDeletes)
+            {
+                _director.AddDirectoryDeleteCallback((args) => Fsw_DirectoryDeleted(null, args));
+            }
+            if (handleDirectoryDeletes)
+            {
+                _director.AddDirectoryCreateCallback((args) => Fsw_DirectoryCreated(null, args));
+                _director.AddDirectoryRenameCallback((args) => Fsw_DirectoryRenamed(null, args));
+            }
         }
 
         public RemoteSync(string host, string username, string password,
             string localRootDirectory, string remoteRootDirectory,
-            string searchPattern, SyncDirector director, List<string>? excludedFolders, Task initialSyncTask)
+            string searchPattern, SyncDirector director, List<string>? excludedFolders, Task initialSyncTask, bool deleteEnabled, bool handleDirectoryDeletes)
         {
             _host = host;
             _username = username;
@@ -66,6 +80,7 @@ namespace SFTPSyncLib
             _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
             _director = director;
             _excludedFolders = excludedFolders ?? new List<string>();
+            _deleteEnabled = deleteEnabled;
             _sftp = new SftpClient(host, username, password);
 
             DoneMakingFolders = Task.CompletedTask;
@@ -74,6 +89,15 @@ namespace SFTPSyncLib
 
             // Register callbacks immediately; handler will ignore events until initial sync completes.
             _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
+            if (deleteEnabled && handleDirectoryDeletes)
+            {
+                _director.AddDirectoryDeleteCallback((args) => Fsw_DirectoryDeleted(null, args));
+            }
+            if (handleDirectoryDeletes)
+            {
+                _director.AddDirectoryCreateCallback((args) => Fsw_DirectoryCreated(null, args));
+                _director.AddDirectoryRenameCallback((args) => Fsw_DirectoryRenamed(null, args));
+            }
         }
 
         public static async Task RunSharedInitialSyncAsync(
@@ -96,7 +120,7 @@ namespace SFTPSyncLib
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to create directories. Exception: {ex.Message}");
+                Logger.LogError($"Create directories failed. Exception: {ex.Message}");
                 throw;
             }
 
@@ -127,7 +151,7 @@ namespace SFTPSyncLib
                             }
                             catch (Exception ex)
                             {
-                                Logger.LogError($"Failed to sync {item.LocalPath} ({item.SearchPattern}). Exception: {ex.Message}");
+                                Logger.LogError($"Sync failed for {item.LocalPath} ({item.SearchPattern}). Exception: {ex.Message}");
                             }
                         }
                     }
@@ -176,7 +200,7 @@ namespace SFTPSyncLib
                     retryCount++;
                     if (retryCount >= maxRetries)
                     {
-                        Logger.LogError($"Failed to sync after {maxRetries} retries. Exception: {ex.Message}");
+                        Logger.LogError($"Sync failed after {maxRetries} retries. Exception: {ex.Message}");
                         return;
                     }
 
@@ -190,7 +214,7 @@ namespace SFTPSyncLib
         {
             if (new DirectoryInfo(sourcePath).EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly).Any())
             {
-                Logger.LogInfo($"Sync started for {sourcePath}\\{searchPattern}");
+                Logger.LogInfo($"Initial sync started for {sourcePath}\\{searchPattern}");
 
                 return Task<IEnumerable<FileInfo>>.Factory.FromAsync(sftp.BeginSynchronizeDirectories,
                                                    sftp.EndSynchronizeDirectories, sourcePath,
@@ -220,7 +244,7 @@ namespace SFTPSyncLib
             }
             catch (Exception)
             {
-                Logger.LogError("Failed to create directories. Check the remote root directory exists.");
+                Logger.LogError("Failed to create directories. Check the remote target directory exists.");
 
                 Environment.Exit(-1);
             }
@@ -241,7 +265,9 @@ namespace SFTPSyncLib
                 return;
 
             //Get the local directories to sync
-            var localDirectories = FilteredDirectories(localPath);
+            var localDirectories = FilteredDirectories(localPath)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
 
             //Get the remote directories to sync, removing the .DIR suffix if it exists
             var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
@@ -293,19 +319,20 @@ namespace SFTPSyncLib
             string remoteRootDirectory,
             List<string>? excludedFolders)
         {
-            var stack = new Stack<(string LocalPath, string RemotePath)>();
-            stack.Push((localRootDirectory, remoteRootDirectory));
+            var queue = new Queue<(string LocalPath, string RemotePath)>();
+            queue.Enqueue((localRootDirectory, remoteRootDirectory));
 
-            while (stack.Count > 0)
+            while (queue.Count > 0)
             {
-                var current = stack.Pop();
+                var current = queue.Dequeue();
                 yield return current;
 
-                foreach (var directory in FilteredDirectories(localRootDirectory, current.LocalPath, excludedFolders))
+                foreach (var directory in FilteredDirectories(localRootDirectory, current.LocalPath, excludedFolders)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
                 {
                     var directoryName = directory.Split(Path.DirectorySeparatorChar).Last();
                     var remotePath = current.RemotePath + "/" + directoryName;
-                    stack.Push((directory, remotePath));
+                    queue.Enqueue((directory, remotePath));
                 }
             }
         }
@@ -317,7 +344,9 @@ namespace SFTPSyncLib
             string remotePath,
             List<string>? excludedFolders)
         {
-            var localDirectories = FilteredDirectories(localRootDirectory, localPath, excludedFolders);
+            var localDirectories = FilteredDirectories(localRootDirectory, localPath, excludedFolders)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
 
             var remoteDirectories = (await ListDirectoryAsync(sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
             {
@@ -419,7 +448,9 @@ namespace SFTPSyncLib
 
         public Task<bool> ConnectAsync()
         {
-            return Task.Run(() => EnsureConnectedSafe());
+            var task = Task.Run(() => EnsureConnectedSafe());
+            _connectTask = task;
+            return task;
         }
 
 
@@ -427,15 +458,28 @@ namespace SFTPSyncLib
         {
             try
             {
+                if (_shutdownCts.IsCancellationRequested)
+                    return;
+
                 if (!DoneInitialSync.IsCompleted)
                     return;
+
+                if (_deleteEnabled && arg.ChangeType == WatcherChangeTypes.Deleted)
+                {
+                    await SyncFileDeleteAsync(arg);
+                    return;
+                }
 
                 if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
                     || arg.ChangeType == WatcherChangeTypes.Renamed)
                 {
+                    var renamedArgs = arg as RenamedEventArgs;
                     var changedPath = Path.GetDirectoryName(arg.FullPath);
                     var fullRemotePath = GetRemotePathForLocal(changedPath ?? _localRootDirectory);
                     var fullRemoteFilePath = GetRemotePathForLocal(arg.FullPath);
+                    var oldRemoteFilePath = renamedArgs != null
+                        ? GetRemotePathForLocal(renamedArgs.OldFullPath)
+                        : null;
                     await Task.Yield();
                     bool makeDirectory = true;
                     lock (_activeDirSync)
@@ -497,7 +541,7 @@ namespace SFTPSyncLib
                             return;
                         if (DateTime.UtcNow - waitStart > TimeSpan.FromSeconds(30))
                         {
-                            Logger.LogWarnig($"Timed out waiting for file to be ready: {arg.FullPath}");
+                            Logger.LogWarnig($"Timeout waiting for file ready: {arg.FullPath}");
                             return;
                         }
                         await Task.Delay(25);
@@ -519,6 +563,31 @@ namespace SFTPSyncLib
                         if (fileConnectionOk)
                         {
                             SyncFile(_sftp, arg.FullPath, fullRemoteFilePath);
+
+                            if (_deleteEnabled && oldRemoteFilePath != null
+                                && !string.Equals(oldRemoteFilePath, fullRemoteFilePath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (_sftp.Exists(oldRemoteFilePath))
+                                {
+                                    var attributes = _sftp.GetAttributes(oldRemoteFilePath);
+                                    if (!attributes.IsDirectory)
+                                    {
+                                        _sftp.DeleteFile(oldRemoteFilePath);
+                                    }
+                                    else
+                                    {
+                                        Logger.LogWarnig($"Rename cleanup skipped (directory): {oldRemoteFilePath}");
+                                    }
+                                }
+                                else
+                                {
+                                    Logger.LogWarnig($"Rename cleanup skipped (not found): {oldRemoteFilePath}");
+                                }
+                            }
+                            else if (_deleteEnabled && oldRemoteFilePath == null)
+                            {
+                                Logger.LogWarnig("Rename cleanup skipped (missing old path).");
+                            }
                         }
                     }
                     finally
@@ -536,15 +605,201 @@ namespace SFTPSyncLib
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Unhandled exception in file sync handler: {ex.Message}");
+                Logger.LogError($"Unhandled file sync handler exception: {ex.Message}");
+            }
+        }
+
+        private async void Fsw_DirectoryDeleted(object? sender, FileSystemEventArgs arg)
+        {
+            try
+            {
+                if (_shutdownCts.IsCancellationRequested)
+                    return;
+
+                if (!DoneInitialSync.IsCompleted)
+                    return;
+
+                var remotePath = GetRemotePathForLocal(arg.FullPath);
+                await _sftpLock.WaitAsync();
+                try
+                {
+                    if (EnsureConnectedSafe())
+                    {
+                        if (!_sftp.Exists(remotePath) && !_sftp.Exists(remotePath + ".DIR"))
+                        {
+                            Logger.LogWarnig($"Deleting directory skipped (not found): {remotePath}");
+                        }
+                        else
+                        {
+                            Logger.LogInfo($"Deleting directory {remotePath}");
+                            DeleteRemotePathRecursive(_sftp, remotePath);
+                        }
+                    }
+                }
+                finally
+                {
+                    _sftpLock.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unhandled directory delete handler exception: {ex.Message}");
+            }
+        }
+
+        private async void Fsw_DirectoryCreated(object? sender, FileSystemEventArgs arg)
+        {
+            try
+            {
+                if (_shutdownCts.IsCancellationRequested)
+                    return;
+
+                if (!DoneInitialSync.IsCompleted)
+                    return;
+
+                if (IsExcludedDirectoryPath(arg.FullPath))
+                    return;
+
+                var remotePath = GetRemotePathForLocal(arg.FullPath);
+                await _sftpLock.WaitAsync();
+                try
+                {
+                    if (EnsureConnectedSafe())
+                    {
+                        if (!_sftp.Exists(remotePath))
+                        {
+                            Logger.LogInfo($"Creating directory {remotePath}");
+                            _sftp.CreateDirectory(remotePath);
+                        }
+                    }
+                }
+                finally
+                {
+                    _sftpLock.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unhandled directory create handler exception: {ex.Message}");
+            }
+        }
+
+        private async void Fsw_DirectoryRenamed(object? sender, RenamedEventArgs arg)
+        {
+            try
+            {
+                if (_shutdownCts.IsCancellationRequested)
+                    return;
+
+                if (!DoneInitialSync.IsCompleted)
+                    return;
+
+                if (IsExcludedDirectoryPath(arg.OldFullPath) || IsExcludedDirectoryPath(arg.FullPath))
+                    return;
+
+                var oldRemotePath = GetRemotePathForLocal(arg.OldFullPath);
+                var newRemotePath = GetRemotePathForLocal(arg.FullPath);
+
+                await _sftpLock.WaitAsync();
+                try
+                {
+                    if (!EnsureConnectedSafe())
+                        return;
+
+                    if (TryRenameRemoteDirectory(_sftp, oldRemotePath, newRemotePath))
+                    {
+                        Logger.LogInfo($"Renamed directory {oldRemotePath} -> {newRemotePath}");
+                        return;
+                    }
+
+                    Logger.LogWarnig($"Directory rename failed. Attempting fallback: {oldRemotePath} -> {newRemotePath}");
+
+                    MoveRemoteDirectoryRecursive(_sftp, oldRemotePath, newRemotePath);
+
+                    Logger.LogInfo($"Fallback directory rename completed: {oldRemotePath} -> {newRemotePath}");
+                }
+                finally
+                {
+                    _sftpLock.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unhandled directory rename handler exception: {ex.Message}");
+            }
+        }
+
+        private async Task SyncFileDeleteAsync(FileSystemEventArgs arg)
+        {
+            if (_shutdownCts.IsCancellationRequested)
+                return;
+
+            var remotePath = GetRemotePathForLocal(arg.FullPath);
+
+            await _sftpLock.WaitAsync();
+
+            try
+            {
+                if (!EnsureConnectedSafe())
+                    return;
+
+                if (_sftp.Exists(remotePath))
+                {
+                    var attributes = _sftp.GetAttributes(remotePath);
+
+                    if (!attributes.IsDirectory)
+                    {
+                        Logger.LogInfo($"Syncing delete {arg.FullPath}");
+                        _sftp.DeleteFile(remotePath);
+                    }
+                    else
+                    {
+                        Logger.LogWarnig($"Syncing delete skipped (directory): {remotePath}");
+                    }
+                }
+                else
+                {
+                    Logger.LogWarnig($"Syncing delete {remotePath} not found");
+                }
+            }
+            finally
+            {
+                _sftpLock.Release();
             }
         }
 
         public void Dispose()
         {
-            if (_sftp != null)
+            lock (_disposeLock)
             {
+                if (_disposed)
+                    return;
+
+                if (!_shutdownCts.IsCancellationRequested)
+                {
+                    _shutdownCts.Cancel();
+                }
+
+                var connectTask = _connectTask;
+                if (connectTask != null && !connectTask.IsCompleted)
+                {
+                    _ = connectTask.ContinueWith(_ => DisposeNow(), TaskScheduler.Default);
+                    return;
+                }
+
+                DisposeNow();
+            }
+        }
+
+        private void DisposeNow()
+        {
+            lock (_disposeLock)
+            {
+                if (_disposed)
+                    return;
+
                 _disposed = true;
+                _shutdownCts.Dispose();
                 _sftp.Dispose();
             }
         }
@@ -561,6 +816,148 @@ namespace SFTPSyncLib
             public string LocalPath { get; }
             public string RemotePath { get; }
             public string SearchPattern { get; }
+        }
+
+        private bool IsExcludedDirectoryPath(string localPath)
+        {
+            var fullPath = Path.GetFullPath(localPath).TrimEnd(Path.DirectorySeparatorChar);
+            if (!fullPath.StartsWith(_localRootDirectory, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var relativePath = fullPath.Substring(_localRootDirectory.Length);
+            if (string.IsNullOrWhiteSpace(relativePath))
+                return false;
+
+            bool isExcluded = relativePath.EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+                              || relativePath.EndsWith(".vs", StringComparison.OrdinalIgnoreCase)
+                              || relativePath.EndsWith("bin", StringComparison.OrdinalIgnoreCase)
+                              || relativePath.EndsWith("obj", StringComparison.OrdinalIgnoreCase)
+                              || relativePath.Contains(".");
+
+            if (!isExcluded && _excludedFolders != null && _excludedFolders.Count > 0)
+            {
+                isExcluded = _excludedFolders.Any(excluded =>
+                {
+                    var excludedFullPath = Path.GetFullPath(excluded).TrimEnd(Path.DirectorySeparatorChar);
+                    return string.Equals(fullPath, excludedFullPath, StringComparison.OrdinalIgnoreCase);
+                });
+            }
+
+            return isExcluded;
+        }
+
+        private static void DeleteRemotePathRecursive(SftpClient sftp, string remotePath)
+        {
+            if (!sftp.Exists(remotePath))
+            {
+                var vmsDirectoryPath = remotePath + ".DIR";
+                if (!sftp.Exists(vmsDirectoryPath))
+                    return;
+                remotePath = vmsDirectoryPath;
+            }
+
+            var attributes = sftp.GetAttributes(remotePath);
+            if (!attributes.IsDirectory)
+            {
+                sftp.DeleteFile(remotePath);
+                return;
+            }
+
+            foreach (var entry in sftp.ListDirectory(remotePath))
+            {
+                if (entry.Name == "." || entry.Name == "..")
+                    continue;
+
+                if (entry.IsDirectory)
+                {
+                    DeleteRemotePathRecursive(sftp, entry.FullName);
+                }
+                else
+                {
+                    sftp.DeleteFile(entry.FullName);
+                }
+            }
+
+            sftp.DeleteDirectory(remotePath);
+        }
+
+        private static bool TryRenameRemoteDirectory(SftpClient sftp, string oldRemotePath, string newRemotePath)
+        {
+            string? actualOldPath = null;
+            string? actualNewPath = null;
+
+            if (sftp.Exists(oldRemotePath))
+            {
+                actualOldPath = oldRemotePath;
+                actualNewPath = newRemotePath;
+            }
+            else if (sftp.Exists(oldRemotePath + ".DIR"))
+            {
+                actualOldPath = oldRemotePath + ".DIR";
+                actualNewPath = newRemotePath + ".DIR";
+            }
+
+            if (actualOldPath == null || actualNewPath == null)
+                return false;
+
+            try
+            {
+                sftp.RenameFile(actualOldPath, actualNewPath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Directory rename failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static void MoveRemoteDirectoryRecursive(SftpClient sftp, string oldRemotePath, string newRemotePath)
+        {
+            string actualOldPath;
+            string actualNewPath = newRemotePath;
+
+            if (sftp.Exists(oldRemotePath))
+            {
+                actualOldPath = oldRemotePath;
+            }
+            else if (sftp.Exists(oldRemotePath + ".DIR"))
+            {
+                actualOldPath = oldRemotePath + ".DIR";
+                actualNewPath = newRemotePath + ".DIR";
+            }
+            else
+            {
+                Logger.LogError($"Directory not found for rename: {oldRemotePath}");
+                return;
+            }
+
+            if (!sftp.Exists(actualNewPath))
+            {
+                sftp.CreateDirectory(actualNewPath);
+            }
+
+            foreach (var entry in sftp.ListDirectory(actualOldPath))
+            {
+                if (entry.Name == "." || entry.Name == "..")
+                    continue;
+
+                var destinationPath = actualNewPath + "/" + entry.Name;
+                try
+                {
+                    sftp.RenameFile(entry.FullName, destinationPath);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Remote file move failed for {entry.FullName}: {ex.Message}");
+                    if (entry.IsDirectory)
+                    {
+                        MoveRemoteDirectoryRecursive(sftp, entry.FullName, destinationPath);
+                    }
+                }
+            }
+
+            DeleteRemotePathRecursive(sftp, actualOldPath);
         }
     }
 }
