@@ -473,9 +473,13 @@ namespace SFTPSyncLib
                 if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
                     || arg.ChangeType == WatcherChangeTypes.Renamed)
                 {
+                    var renamedArgs = arg as RenamedEventArgs;
                     var changedPath = Path.GetDirectoryName(arg.FullPath);
                     var fullRemotePath = GetRemotePathForLocal(changedPath ?? _localRootDirectory);
                     var fullRemoteFilePath = GetRemotePathForLocal(arg.FullPath);
+                    var oldRemoteFilePath = renamedArgs != null
+                        ? GetRemotePathForLocal(renamedArgs.OldFullPath)
+                        : null;
                     await Task.Yield();
                     bool makeDirectory = true;
                     lock (_activeDirSync)
@@ -559,6 +563,17 @@ namespace SFTPSyncLib
                         if (fileConnectionOk)
                         {
                             SyncFile(_sftp, arg.FullPath, fullRemoteFilePath);
+
+                            if (_deleteEnabled && oldRemoteFilePath != null
+                                && !string.Equals(oldRemoteFilePath, fullRemoteFilePath, StringComparison.OrdinalIgnoreCase)
+                                && _sftp.Exists(oldRemoteFilePath))
+                            {
+                                var attributes = _sftp.GetAttributes(oldRemoteFilePath);
+                                if (!attributes.IsDirectory)
+                                {
+                                    _sftp.DeleteFile(oldRemoteFilePath);
+                                }
+                            }
                         }
                     }
                     finally
