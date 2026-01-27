@@ -565,14 +565,28 @@ namespace SFTPSyncLib
                             SyncFile(_sftp, arg.FullPath, fullRemoteFilePath);
 
                             if (_deleteEnabled && oldRemoteFilePath != null
-                                && !string.Equals(oldRemoteFilePath, fullRemoteFilePath, StringComparison.OrdinalIgnoreCase)
-                                && _sftp.Exists(oldRemoteFilePath))
+                                && !string.Equals(oldRemoteFilePath, fullRemoteFilePath, StringComparison.OrdinalIgnoreCase))
                             {
-                                var attributes = _sftp.GetAttributes(oldRemoteFilePath);
-                                if (!attributes.IsDirectory)
+                                if (_sftp.Exists(oldRemoteFilePath))
                                 {
-                                    _sftp.DeleteFile(oldRemoteFilePath);
+                                    var attributes = _sftp.GetAttributes(oldRemoteFilePath);
+                                    if (!attributes.IsDirectory)
+                                    {
+                                        _sftp.DeleteFile(oldRemoteFilePath);
+                                    }
+                                    else
+                                    {
+                                        Logger.LogWarnig($"Rename cleanup skipped (directory): {oldRemoteFilePath}");
+                                    }
                                 }
+                                else
+                                {
+                                    Logger.LogWarnig($"Rename cleanup skipped (not found): {oldRemoteFilePath}");
+                                }
+                            }
+                            else if (_deleteEnabled && oldRemoteFilePath == null)
+                            {
+                                Logger.LogWarnig("Rename cleanup skipped (missing old path).");
                             }
                         }
                     }
@@ -611,8 +625,15 @@ namespace SFTPSyncLib
                 {
                     if (EnsureConnectedSafe())
                     {
-                        Logger.LogInfo($"Deleting directory {remotePath}");
-                        DeleteRemotePathRecursive(_sftp, remotePath);
+                        if (!_sftp.Exists(remotePath) && !_sftp.Exists(remotePath + ".DIR"))
+                        {
+                            Logger.LogWarnig($"Deleting directory skipped (not found): {remotePath}");
+                        }
+                        else
+                        {
+                            Logger.LogInfo($"Deleting directory {remotePath}");
+                            DeleteRemotePathRecursive(_sftp, remotePath);
+                        }
                     }
                 }
                 finally
@@ -730,6 +751,10 @@ namespace SFTPSyncLib
                     {
                         Logger.LogInfo($"Syncing delete {arg.FullPath}");
                         _sftp.DeleteFile(remotePath);
+                    }
+                    else
+                    {
+                        Logger.LogWarnig($"Syncing delete skipped (directory): {remotePath}");
                     }
                 }
                 else
