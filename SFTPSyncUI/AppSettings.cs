@@ -192,6 +192,25 @@ namespace SFTPSyncUI
             }
         }
 
+        // Support delted files and folders
+
+        private bool deleteEnabled = false;
+        public bool DeleteEnabled
+        {
+            get => deleteEnabled;
+            set
+            {
+                if (deleteEnabled != value)
+                {
+                    deleteEnabled = value;
+                    if (!initialLoadSettings)
+                    {
+                        SaveToFile();
+                    }
+                }
+            }
+        }
+
         //Local path
 
         private string localPath = String.Empty;
@@ -331,6 +350,5 @@ namespace SFTPSyncUI
                 }
             }
         }
-
     }
 }
