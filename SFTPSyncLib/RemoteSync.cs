@@ -110,6 +110,9 @@ namespace SFTPSyncLib
                 return;
             }
 
+            localRootDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(localRootDirectory));
+            remoteRootDirectory = NormalizeRemoteRootDirectory(remoteRootDirectory);
+
             try
             {
                 using (var sftp = new SftpClient(host, username, password))
@@ -282,7 +285,8 @@ namespace SFTPSyncLib
             foreach (var item in localDirectories)
             {
                 var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
-                await InitialSync(localPath + "\\" + directoryName, remotePath + "/" + directoryName);
+                var nextRemotePath = AppendRemotePath(remotePath, directoryName);
+                await InitialSync(localPath + "\\" + directoryName, nextRemotePath);
             }
 
             await SyncDirectoryAsync(_sftp, localPath, remotePath, _searchPattern);
@@ -331,7 +335,7 @@ namespace SFTPSyncLib
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
                 {
                     var directoryName = directory.Split(Path.DirectorySeparatorChar).Last();
-                    var remotePath = current.RemotePath + "/" + directoryName;
+                    var remotePath = AppendRemotePath(current.RemotePath, directoryName);
                     queue.Enqueue((directory, remotePath));
                 }
             }
@@ -359,12 +363,13 @@ namespace SFTPSyncLib
             foreach (var item in localDirectories)
             {
                 var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
+                var targetRemotePath = AppendRemotePath(remotePath, directoryName);
                 if (!remoteDirectories.ContainsKey(directoryName))
                 {
-                    Logger.LogInfo($"Creating remote directory {remotePath}{directoryName}");
-                    sftp.CreateDirectory(remotePath + "/" + directoryName);
+                    Logger.LogInfo($"Creating remote directory {targetRemotePath}");
+                    sftp.CreateDirectory(targetRemotePath);
                 }
-                await CreateDirectoriesInternal(sftp, localRootDirectory, localPath + "\\" + directoryName, remotePath + "/" + directoryName, excludedFolders);
+                await CreateDirectoriesInternal(sftp, localRootDirectory, localPath + "\\" + directoryName, targetRemotePath, excludedFolders);
             }
         }
 
@@ -419,6 +424,32 @@ namespace SFTPSyncLib
                 return _remoteRootDirectory;
 
             return _remoteRootDirectory + "/" + relativePath;
+        }
+
+        private static string NormalizeRemoteRootDirectory(string remoteRootDirectory)
+        {
+            if (remoteRootDirectory == "/")
+                return "/";
+
+            return remoteRootDirectory.TrimEnd('/', '\\');
+        }
+
+        private static string AppendRemotePath(string remotePath, string segment)
+        {
+            if (string.IsNullOrEmpty(segment))
+                return remotePath;
+
+            var normalizedSegment = segment.Replace('\\', '/').Trim('/');
+            if (normalizedSegment.Length == 0)
+                return remotePath;
+
+            if (remotePath == "/")
+                return "/" + normalizedSegment;
+
+            if (string.IsNullOrEmpty(remotePath))
+                return normalizedSegment;
+
+            return remotePath + "/" + normalizedSegment;
         }
 
         private void EnsureConnected()

@@ -20,6 +20,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.github\workflows\build.yml = .github\workflows\build.yml
 		LICENSE.md = LICENSE.md
 		README.md = README.md
+		UpdateSubModules.bat = UpdateSubModules.bat
 	EndProjectSection
 EndProject
 Global
