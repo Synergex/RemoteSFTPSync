@@ -1,6 +1,7 @@
 ﻿using Renci.SshNet;
 using Renci.SshNet.Sftp;
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 
 namespace SFTPSyncLib
 {
@@ -23,6 +24,11 @@ namespace SFTPSyncLib
         HashSet<string> _activeDirSync = new HashSet<string>();
         readonly SemaphoreSlim _sftpLock = new SemaphoreSlim(1, 1);
         bool _disposed;
+
+        // VS writes to a temp file (8 alphanum chars + "." + 1-4 alphanum chars + "~") then renames it to the real file.
+        // The temp was never synced remotely, so suppress the "not found" cleanup warning for these names.
+        private static readonly Regex _vsTempFilePattern = new Regex(@"^[a-zA-Z0-9]{8}\.[a-zA-Z0-9]{1,4}~$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static bool IsVsTempFile(string path) => _vsTempFilePattern.IsMatch(Path.GetFileName(path));
 
         
         public Task DoneMakingFolders { get; }
@@ -596,6 +602,7 @@ namespace SFTPSyncLib
                             SyncFile(_sftp, arg.FullPath, fullRemoteFilePath);
 
                             if (_deleteEnabled && oldRemoteFilePath != null
+                                && !IsVsTempFile(renamedArgs!.OldFullPath)
                                 && !string.Equals(oldRemoteFilePath, fullRemoteFilePath, StringComparison.OrdinalIgnoreCase))
                             {
                                 if (_sftp.Exists(oldRemoteFilePath))
@@ -648,6 +655,9 @@ namespace SFTPSyncLib
                     return;
 
                 if (!DoneInitialSync.IsCompleted)
+                    return;
+
+                if (IsExcludedDirectoryPath(arg.FullPath))
                     return;
 
                 var remotePath = GetRemotePathForLocal(arg.FullPath);
@@ -870,7 +880,8 @@ namespace SFTPSyncLib
                 isExcluded = _excludedFolders.Any(excluded =>
                 {
                     var excludedFullPath = Path.GetFullPath(excluded).TrimEnd(Path.DirectorySeparatorChar);
-                    return string.Equals(fullPath, excludedFullPath, StringComparison.OrdinalIgnoreCase);
+                    return string.Equals(fullPath, excludedFullPath, StringComparison.OrdinalIgnoreCase)
+                           || fullPath.StartsWith(excludedFullPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
                 });
             }
 

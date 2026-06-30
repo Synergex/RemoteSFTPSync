@@ -20,8 +20,8 @@
     <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
     <Company>Synergex International, Inc.</Company>
-    <AssemblyVersion>1.8</AssemblyVersion>
-    <FileVersion>1.8</FileVersion>
+    <AssemblyVersion>1.9</AssemblyVersion>
+    <FileVersion>1.9</FileVersion>
     <LangVersion>preview</LangVersion>
     <Version>1.8</Version>
   </PropertyGroup>
