@@ -21,10 +21,10 @@ jobs:
         fetch-depth: 0
         submodules: 'recursive'
 
-    - name: Setup .NET 8 SDK
+    - name: Setup .NET 10 SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.x'
+        dotnet-version: '10.x'
 
     - name: Install AzureSignTool
       run: dotnet tool install --global AzureSignTool
@@ -41,7 +41,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output SFTPSync/bin/Release/net8.0-windows/publish/win-x64 `
+          --output SFTPSync/bin/Release/net10.0-windows/publish/win-x64 `
           /p:PublishSingleFile=true `
           /p:PublishReadyToRun=true
 
@@ -51,7 +51,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output SFTPSyncStop/bin/Release/net8.0-windows/publish/win-x64 `
+          --output SFTPSyncStop/bin/Release/net10.0-windows/publish/win-x64 `
           /p:PublishSingleFile=true `
           /p:PublishReadyToRun=true
 
@@ -61,7 +61,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output SFTPSyncUI/bin/Release/net8.0-windows/publish/win-x64 `
+          --output SFTPSyncUI/bin/Release/net10.0-windows/publish/win-x64 `
           /p:PublishSingleFile=true `
           /p:PublishReadyToRun=true
 

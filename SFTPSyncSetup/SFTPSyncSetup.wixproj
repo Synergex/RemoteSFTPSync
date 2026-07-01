@@ -49,8 +49,8 @@
     <Error Text="The WiX Toolset v3.11 build tools must be installed to build this project. To download the WiX Toolset, see https://wixtoolset.org/releases/v3.11/stable" />
   </Target>
   <Target Name="BeforeBuild">
-    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\SFTPSyncUI\SFTPSyncUI.csproj&quot; --configuration Release --runtime win-x64 --self-contained true --output &quot;$(MSBuildThisFileDirectory)..\SFTPSyncUI\bin\Release\net8.0-windows\publish\win-x64&quot; /p:PublishSingleFile=true /p:PublishReadyToRun=true" />
-    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\SFTPSyncStop\SFTPSyncStop.csproj&quot; --configuration Release --runtime win-x64 --self-contained true --output &quot;$(MSBuildThisFileDirectory)..\SFTPSyncStop\bin\Release\net8.0-windows\publish\win-x64&quot; /p:PublishSingleFile=true /p:PublishReadyToRun=true" />
-    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\SFTPSync\SFTPSync.csproj&quot; --configuration Release --runtime win-x64 --self-contained true --output &quot;$(MSBuildThisFileDirectory)..\SFTPSync\bin\Release\net8.0-windows\publish\win-x64&quot; /p:PublishSingleFile=true /p:PublishReadyToRun=true" />
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\SFTPSyncUI\SFTPSyncUI.csproj&quot; --configuration Release --runtime win-x64 --self-contained true --output &quot;$(MSBuildThisFileDirectory)..\SFTPSyncUI\bin\Release\net10.0-windows\publish\win-x64&quot; /p:PublishSingleFile=true /p:PublishReadyToRun=true" />
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\SFTPSyncStop\SFTPSyncStop.csproj&quot; --configuration Release --runtime win-x64 --self-contained true --output &quot;$(MSBuildThisFileDirectory)..\SFTPSyncStop\bin\Release\net10.0-windows\publish\win-x64&quot; /p:PublishSingleFile=true /p:PublishReadyToRun=true" />
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\SFTPSync\SFTPSync.csproj&quot; --configuration Release --runtime win-x64 --self-contained true --output &quot;$(MSBuildThisFileDirectory)..\SFTPSync\bin\Release\net10.0-windows\publish\win-x64&quot; /p:PublishSingleFile=true /p:PublishReadyToRun=true" />
   </Target>
 </Project>
