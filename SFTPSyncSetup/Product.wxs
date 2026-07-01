@@ -72,6 +72,18 @@
 				<File Id="PresentationNativeCor3Dll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\PresentationNative_cor3.dll" KeyPath="yes" />
 			</Component>-->
 
+			<Component Id="BouncyCastleDll" Guid="*" Win64="yes">
+				<File Id="BouncyCastleDll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\BouncyCastle.Cryptography.dll" KeyPath="yes" />
+			</Component>
+
+			<Component Id="MicrosoftExtensionsLoggingDll" Guid="*" Win64="yes">
+				<File Id="MicrosoftExtensionsLoggingDll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\Microsoft.Extensions.Logging.Abstractions.dll" KeyPath="yes" />
+			</Component>
+
+			<Component Id="RenciSshNetDll" Guid="*" Win64="yes">
+				<File Id="RenciSshNetDll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\Renci.SshNet.dll" KeyPath="yes" />
+			</Component>
+
 			<Component Id="RenciSshNetPdb" Guid="*" Win64="yes">
 				<File Id="RenciSshNetPdb" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\Renci.SshNet.pdb" KeyPath="yes" />
 			</Component>
@@ -80,8 +92,28 @@
 				<File Id="RenciSshNetXml" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\Renci.SshNet.xml" KeyPath="yes" />
 			</Component>
 
+			<Component Id="SFTPSyncLibDll" Guid="*" Win64="yes">
+				<File Id="SFTPSyncLibDll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\SFTPSyncLib.dll" KeyPath="yes" />
+			</Component>
+
 			<Component Id="SFTPSyncLibPdb" Guid="*" Win64="yes">
 				<File Id="SFTPSyncLibPdb" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\SFTPSyncLib.pdb" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SystemSecurityCryptographyDll" Guid="*" Win64="yes">
+				<File Id="SystemSecurityCryptographyDll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\System.Security.Cryptography.ProtectedData.dll" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncUiDll" Guid="*" Win64="yes">
+				<File Id="SFTPSyncUiDll" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\SFTPSyncUI.dll" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncUiDepsJson" Guid="*" Win64="yes">
+				<File Id="SFTPSyncUiDepsJson" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\SFTPSyncUI.deps.json" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncUiRuntimeConfig" Guid="*" Win64="yes">
+				<File Id="SFTPSyncUiRuntimeConfig" Source="..\SFTPSyncUI\bin\Release\net8.0-windows\SFTPSyncUI.runtimeconfig.json" KeyPath="yes" />
 			</Component>
 
 			<Component Id="SFTPSyncUiExe" Guid="*" Win64="yes">
@@ -106,6 +138,18 @@
 
 			<!-- SFTPSync Application -->
 
+			<Component Id="SFTPSyncDll" Guid="*" Win64="yes">
+				<File Id="SFTPSyncDll" Source="..\SFTPSync\bin\Release\net8.0-windows\SFTPSync.dll" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncDepsJson" Guid="*" Win64="yes">
+				<File Id="SFTPSyncDepsJson" Source="..\SFTPSync\bin\Release\net8.0-windows\SFTPSync.deps.json" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncRuntimeConfig" Guid="*" Win64="yes">
+				<File Id="SFTPSyncRuntimeConfig" Source="..\SFTPSync\bin\Release\net8.0-windows\SFTPSync.runtimeconfig.json" KeyPath="yes" />
+			</Component>
+
 			<Component Id="SFTPSyncExe" Guid="*" Win64="yes">
 				<File Id="SFTPSyncExe" Source="..\SFTPSync\bin\Release\net8.0-windows\SFTPSync.exe" KeyPath="yes" />
 			</Component>
@@ -115,6 +159,18 @@
 			</Component>
 
 			<!-- SFTPSyncStop application -->
+
+			<Component Id="SFTPSyncStopDll" Guid="*" Win64="yes">
+				<File Id="SFTPSyncStopDll" Source="..\SFTPSyncStop\bin\Release\net8.0-windows\SFTPSyncStop.dll" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncStopDepsJson" Guid="*" Win64="yes">
+				<File Id="SFTPSyncStopDepsJson" Source="..\SFTPSyncStop\bin\Release\net8.0-windows\SFTPSyncStop.deps.json" KeyPath="yes" />
+			</Component>
+
+			<Component Id="SFTPSyncStopRuntimeConfig" Guid="*" Win64="yes">
+				<File Id="SFTPSyncStopRuntimeConfig" Source="..\SFTPSyncStop\bin\Release\net8.0-windows\SFTPSyncStop.runtimeconfig.json" KeyPath="yes" />
+			</Component>
 
 			<Component Id="SFTPSyncStopExe" Guid="*" Win64="yes">
 				<File Id="SFTPSyncStopExe" Source="..\SFTPSyncStop\bin\Release\net8.0-windows\SFTPSyncStop.exe" />
@@ -175,22 +231,28 @@
 
 			<!-- Published files -->
 			<ComponentRef Id="AppSettingsJson" />
-			<!--<ComponentRef Id="D3DCompiler47cor3Dll" />
-			<ComponentRef Id="PenImcCor3Dll" />
-			<ComponentRef Id="PresentationNativeCor3Dll" />-->
+			<ComponentRef Id="BouncyCastleDll" />
+			<ComponentRef Id="MicrosoftExtensionsLoggingDll" />
+			<ComponentRef Id="RenciSshNetDll" />
 			<ComponentRef Id="RenciSshNetPdb" />
 			<ComponentRef Id="RenciSshNetXml" />
+			<ComponentRef Id="SFTPSyncLibDll" />
 			<ComponentRef Id="SFTPSyncLibPdb" />
+			<ComponentRef Id="SystemSecurityCryptographyDll" />
+			<ComponentRef Id="SFTPSyncUiDll" />
+			<ComponentRef Id="SFTPSyncUiDepsJson" />
+			<ComponentRef Id="SFTPSyncUiRuntimeConfig" />
 			<ComponentRef Id="SFTPSyncUiExe" />
 			<ComponentRef Id="SFTPSyncUiIco" />
 			<ComponentRef Id="SFTPSyncUiPdb" />
-			<!--<ComponentRef Id="VCRuntime140Cor3Dll" />
-			<ComponentRef Id="WpfGfxCor3Dll" />-->
 
 			<!-- Other files -->
 			<ComponentRef Id="LicenseRtf" />
 
 			<!-- Stop utility -->
+			<ComponentRef Id="SFTPSyncStopDll" />
+			<ComponentRef Id="SFTPSyncStopDepsJson" />
+			<ComponentRef Id="SFTPSyncStopRuntimeConfig" />
 			<ComponentRef Id="SFTPSyncStopExe" />
 
 			<!-- Shortcuts -->
@@ -209,6 +271,9 @@
 			Absent="allow">
 
 			<!-- Published files -->
+			<ComponentRef Id="SFTPSyncDll" />
+			<ComponentRef Id="SFTPSyncDepsJson" />
+			<ComponentRef Id="SFTPSyncRuntimeConfig" />
 			<ComponentRef Id="SFTPSyncExe" />
 			<ComponentRef Id="SFTPSyncPdb" />
 
