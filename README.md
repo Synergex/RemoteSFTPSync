@@ -1,4 +1,4 @@
-[![Build and Package .NET 8 Solution](https://github.com/Synergex/RemoteSFTPSync/actions/workflows/build.yml/badge.svg)](https://github.com/Synergex/RemoteSFTPSync/actions/workflows/build.yml)
+[![Build and Package .NET 10 Solution](https://github.com/Synergex/RemoteSFTPSync/actions/workflows/build.yml/badge.svg)](https://github.com/Synergex/RemoteSFTPSync/actions/workflows/build.yml)
 
 # SFTP Sync
 
@@ -17,5 +17,5 @@ Two versions of the application are available, a Windows desktop application,
 and a command line application.
 
 For additional information on how to use the application, please refer to the
-[Documentation](https://synergex.github.io/RemoteSFTPSync/), which is also 
+[Documentation](https://synergex.github.io/RemoteSFTPSync/), which is also
 available as a Windows help file once you have installed the tool.
