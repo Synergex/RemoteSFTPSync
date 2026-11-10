@@ -12,6 +12,14 @@ namespace SFTPSyncUI
         private AppSettings? _settings = null;
         private bool initialUiLoad = false;
         private bool _syncRunning = false;
+        private bool _invalidRemotePathOnLoad = false;
+
+        private const string InvalidRemotePathMessage =
+            "The remote path must be specified in Linux format (for example /dga1303/1tallent/win), " +
+            "not as an OpenVMS directory specification. Characters [ and ] are not allowed.";
+
+        private static bool ContainsVmsBrackets(string? path) =>
+            path != null && path.IndexOfAny(['[', ']']) >= 0;
 
         public SettingsForm(AppSettings settings, bool syncRunning)
         {
@@ -33,6 +41,14 @@ namespace SFTPSyncUI
 
             textBoxRemotePassword.Text = _settings.RemotePassword.Length > 0 ? DPAPIEncryption.Decrypt(_settings.RemotePassword) : String.Empty;
 
+            //A previously saved path may contain an OpenVMS directory spec. If so, blank it
+            //out and tell the user once the form is shown.
+            if (ContainsVmsBrackets(_settings.RemotePath))
+            {
+                _settings.RemotePath = String.Empty;
+                _invalidRemotePathOnLoad = true;
+            }
+
             textBoxRemotePath.Text = _settings.RemotePath;
             buttonVerifyAccess.Enabled = !_settings.AccessVerified;
 
@@ -50,6 +66,16 @@ namespace SFTPSyncUI
 
         private void SettingsForm_Shown(object sender, EventArgs e)
         {
+            if (_invalidRemotePathOnLoad)
+            {
+                MessageBox.Show(
+                    "The saved remote path was in OpenVMS directory format and has been cleared.\n\n" + InvalidRemotePathMessage,
+                    "Invalid Remote Path",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                textBoxRemotePath.Focus();
+            }
+
             if (_syncRunning)
             {
                 MessageBox.Show("Changes will  not take effect until sync is restarted!", "Sync Running", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -233,8 +259,28 @@ namespace SFTPSyncUI
         }
         private void textBoxRemotePath_TextChanged(object sender, EventArgs e)
         {
-            if (!initialUiLoad)
-                _settings?.RemotePath = textBoxRemotePath.Text;
+            if (initialUiLoad)
+                return;
+
+            //The remote path must be a Linux-style path. An OpenVMS directory spec
+            //(e.g. $1$DGA1303:[1tallent.WIN]) contains square brackets, and will cause
+            //problems if it is allowed to be used.
+            if (ContainsVmsBrackets(textBoxRemotePath.Text))
+            {
+                //Clearing the field re-enters this handler, which stores the empty value.
+                textBoxRemotePath.Clear();
+
+                MessageBox.Show(
+                    InvalidRemotePathMessage,
+                    "Invalid Remote Path",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+
+                textBoxRemotePath.Focus();
+                return;
+            }
+
+            _settings?.RemotePath = textBoxRemotePath.Text;
         }
 
         // ----- APPLICATION SETTINGS CODE -----
