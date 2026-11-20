@@ -1,13 +1,16 @@
 name: Build and Package SFTPSync
 
 on:
+  # PRs build and package (unsigned) to verify the change. Signing and the MSI upload happen only for a release:
+  # push a version tag (e.g. V1.12) or run this workflow manually.
   push:
-    branches:
-      - master
+    tags:
+      - 'V*'
   pull_request:
+  workflow_dispatch:
 
 # Cancel a superseded PR build when new commits are pushed to the same PR.
-# Never cancel a master build, so a release build is not dropped by a later merge.
+# Never cancel a release build.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -33,7 +36,7 @@ jobs:
         dotnet-version: '10.x'
 
     - name: Install AzureSignTool
-      if: github.event_name == 'push'
+      if: github.event_name != 'pull_request'
       run: dotnet tool install --global AzureSignTool
 
     - name: Restore NuGet packages
@@ -73,7 +76,7 @@ jobs:
           /p:PublishReadyToRun=true
 
     - name: Sign executables
-      if: github.event_name == 'push'
+      if: github.event_name != 'pull_request'
       env:
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         AZURE_APPLICATION_ID: ${{ secrets.AZURE_APPLICATION_ID }}
@@ -142,7 +145,7 @@ jobs:
       shell: pwsh
 
     - name: Sign MSI
-      if: github.event_name == 'push'
+      if: github.event_name != 'pull_request'
       env:
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         AZURE_APPLICATION_ID: ${{ secrets.AZURE_APPLICATION_ID }}
@@ -168,7 +171,7 @@ jobs:
         }
 
     - name: Upload MSI artifact
-      if: github.event_name == 'push'
+      if: github.event_name != 'pull_request'
       uses: actions/upload-artifact@v7
       with:
         name: MSI
