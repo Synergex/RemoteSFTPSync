@@ -123,7 +123,7 @@ namespace SFTPSyncLib
             {
                 using (var sftp = new SftpClient(host, username, password))
                 {
-                    sftp.Connect();
+                    await ConnectWithRetryAsync(sftp, "directory creation");
                     await CreateDirectoriesInternal(sftp, localRootDirectory, localRootDirectory, remoteRootDirectory, excludedFolders);
                 }
             }
@@ -147,27 +147,85 @@ namespace SFTPSyncLib
 
             for (int i = 0; i < workerCount; i++)
             {
+                int workerNumber = i + 1;
                 workers.Add(Task.Run(async () =>
                 {
                     using (var sftp = new SftpClient(host, username, password))
                     {
-                        sftp.Connect();
+                        try
+                        {
+                            await ConnectWithRetryAsync(sftp, $"sync worker {workerNumber}");
+                        }
+                        catch (Exception ex)
+                        {
+                            // Other workers drain the shared queue. If none can connect, this is reported after WhenAll.
+                            Logger.LogWarnig($"Sync worker {workerNumber} could not connect and will not take part in the initial sync. Exception: {ex.Message}");
+                            return;
+                        }
+
                         while (workQueue.TryDequeue(out var item))
                         {
-                            try
-                            {
-                                await SyncDirectoryAsync(sftp, item.LocalPath, item.RemotePath, item.SearchPattern);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.LogError($"Sync failed for {item.LocalPath} ({item.SearchPattern}). Exception: {ex.Message}");
-                            }
+                            await SyncDirectoryWithRetryAsync(sftp, item);
                         }
                     }
                 }));
             }
 
             await Task.WhenAll(workers);
+
+            if (!workQueue.IsEmpty)
+            {
+                throw new InvalidOperationException("Initial sync could not complete because no sync worker was able to connect.");
+            }
+        }
+
+        private const int MaxAttempts = 3;
+        private const int RetryDelayMs = 2000;
+
+        private static async Task ConnectWithRetryAsync(SftpClient sftp, string description)
+        {
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    sftp.Connect();
+                    return;
+                }
+                catch (Exception ex) when (attempt < MaxAttempts)
+                {
+                    Logger.LogWarnig($"Connection for {description} failed (attempt {attempt}/{MaxAttempts}), retrying. Exception: {ex.Message}");
+                    await Task.Delay(RetryDelayMs * attempt);
+                }
+            }
+        }
+
+        private static async Task SyncDirectoryWithRetryAsync(SftpClient sftp, SyncWorkItem item)
+        {
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    // Re-establish the connection if a previous timeout dropped it.
+                    if (!sftp.IsConnected)
+                    {
+                        sftp.Connect();
+                    }
+
+                    await SyncDirectoryAsync(sftp, item.LocalPath, item.RemotePath, item.SearchPattern);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    if (attempt >= MaxAttempts)
+                    {
+                        Logger.LogError($"Sync failed for {item.LocalPath} ({item.SearchPattern}) after {MaxAttempts} attempts. Exception: {ex.Message}");
+                        return;
+                    }
+
+                    Logger.LogWarnig($"Sync failed for {item.LocalPath} ({item.SearchPattern}) (attempt {attempt}/{MaxAttempts}), retrying. Exception: {ex.Message}");
+                    await Task.Delay(RetryDelayMs * attempt);
+                }
+            }
         }
 
         /// <summary>
