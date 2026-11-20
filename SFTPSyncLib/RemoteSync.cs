@@ -715,7 +715,7 @@ namespace SFTPSyncLib
                                     Logger.LogWarnig($"Rename cleanup skipped (not found): {oldRemoteFilePath}");
                                 }
                             }
-                            else if (_deleteEnabled && oldRemoteFilePath == null)
+                            else if (_deleteEnabled && renamedArgs != null && oldRemoteFilePath == null)
                             {
                                 Logger.LogWarnig("Rename cleanup skipped (missing old path).");
                             }
