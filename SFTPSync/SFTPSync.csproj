@@ -6,9 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
-    <Version>1.12</Version>
-    <AssemblyVersion>1.12</AssemblyVersion>
-    <FileVersion>1.12</FileVersion>
+    <Version>1.14</Version>
+    <AssemblyVersion>1.14</AssemblyVersion>
+    <FileVersion>1.14</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
