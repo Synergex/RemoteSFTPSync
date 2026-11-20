@@ -1,4 +1,5 @@
 ﻿
+using SFTPSyncLib;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -591,6 +592,46 @@ namespace SFTPSyncUI
                 if (remotePath != value)
                 {
                     remotePath = value;
+                    if (!initialLoadSettings)
+                    {
+                        SaveToFile();
+                    }
+                }
+            }
+        }
+
+        // The number of connections used during the initial sync (work is shared between them)
+
+        private int initialSyncWorkers = RemoteSyncOptions.DefaultInitialSyncWorkers;
+
+        public int InitialSyncWorkers
+        {
+            get => initialSyncWorkers;
+            set
+            {
+                if (initialSyncWorkers != value)
+                {
+                    initialSyncWorkers = value;
+                    if (!initialLoadSettings)
+                    {
+                        SaveToFile();
+                    }
+                }
+            }
+        }
+
+        // The most connections open at once for real-time syncing (opened as needed, closed when idle)
+
+        private int maxConnections = RemoteSyncOptions.DefaultMaxConnections;
+
+        public int MaxConnections
+        {
+            get => maxConnections;
+            set
+            {
+                if (maxConnections != value)
+                {
+                    maxConnections = value;
                     if (!initialLoadSettings)
                     {
                         SaveToFile();

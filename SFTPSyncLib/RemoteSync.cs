@@ -1,183 +1,586 @@
 ﻿using Renci.SshNet;
+using Renci.SshNet.Common;
 using Renci.SshNet.Sftp;
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.IO.Enumeration;
 using System.Text.RegularExpressions;
+using System.Threading.Channels;
 
 namespace SFTPSyncLib
 {
-    public class RemoteSync : IDisposable
+    /// <summary>
+    /// Keeps a local directory tree in sync with a remote one. The initial sync shares its work between a number of
+    /// temporary connections, and afterwards changes are uploaded through a small elastic pool of connections, whatever
+    /// the number of search patterns.
+    /// </summary>
+    public sealed class RemoteSync : IDisposable
     {
-        string _host;
-        string _username;
-        string _password;
-        string _searchPattern;
-        string _localRootDirectory;
-        string _remoteRootDirectory;
-        readonly List<string>? _excludedFolders;
-        readonly bool _deleteEnabled;
-        readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
-        readonly object _disposeLock = new object();
-        Task<bool>? _connectTask;
+        private static readonly TimeSpan IdleConnectionTimeout = TimeSpan.FromSeconds(60);
 
-        SftpClient _sftp;
-        SyncDirector _director;
-        HashSet<string> _activeDirSync = new HashSet<string>();
-        readonly SemaphoreSlim _sftpLock = new SemaphoreSlim(1, 1);
-        bool _disposed;
+        // Bounds the number of changed files being prepared (waiting for a connection or for the file to be writable)
+        private const int MaxPendingFileTasks = 64;
+
+        private readonly RemoteSyncOptions _options;
+        private readonly string[] _searchPatterns;
+        private readonly string _localRootDirectory;
+        private readonly string _remoteRootDirectory;
+        private readonly List<string> _excludedFolders;
+        private readonly bool _deleteEnabled;
+        private readonly SyncDirector _director;
+        private readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
+        private readonly CancellationToken _token;
+        private readonly SftpConnectionPool _pool;
+        private readonly object _disposeLock = new object();
+        private bool _disposed;
+
+        // Set once the initial sync has completed. File system events before then are ignored.
+        private volatile bool _realtimeActive;
+
+        // Changes waiting to be uploaded. A file that changes again before its upload has started is only uploaded once.
+        private readonly object _queueLock = new object();
+        private readonly Dictionary<string, PendingChange> _pending = new Dictionary<string, PendingChange>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _inFlight = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _blocked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Channel<string> _queue = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+        private readonly SemaphoreSlim _pendingFileTasks = new SemaphoreSlim(MaxPendingFileTasks);
+        private long _directoryOperationSequence;
+
+        // Remote directories that are known to exist, to avoid checking for them before every upload
+        private readonly ConcurrentDictionary<string, byte> _knownRemoteDirectories = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        private readonly object _directoryCreateLock = new object();
 
         // VS writes to a temp file (8 alphanum chars + "." + 1-4 alphanum chars + "~") then renames it to the real file.
         // The temp was never synced remotely, so suppress the "not found" cleanup warning for these names.
         private static readonly Regex _vsTempFilePattern = new Regex(@"^[a-zA-Z0-9]{8}\.[a-zA-Z0-9]{1,4}~$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static bool IsVsTempFile(string path) => _vsTempFilePattern.IsMatch(Path.GetFileName(path));
 
-        
-        public Task DoneMakingFolders { get; }
-
-        public Task DoneInitialSync { get; }
-
-        public RemoteSync(string host, string username, string password,
-            string localRootDirectory, string remoteRootDirectory, 
-            string searchPattern, bool createFolders, SyncDirector director, List<string>? excludedFolders, bool deleteEnabled, bool handleDirectoryDeletes)
+        public RemoteSync(RemoteSyncOptions options, SyncDirector director)
         {
-            _host = host;
-            _username = username;
-            _password = password;
-            _searchPattern = searchPattern;
-            _localRootDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(localRootDirectory));
-            _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
+            _options = options;
+            _searchPatterns = options.SearchPatterns;
+            _localRootDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(options.LocalRootDirectory));
+            _remoteRootDirectory = options.RemoteRootDirectory.TrimEnd('/', '\\');
+            _excludedFolders = options.ExcludedFolders ?? new List<string>();
+            _deleteEnabled = options.DeleteEnabled;
             _director = director;
-            _excludedFolders = excludedFolders ?? new List<string>();
-            _deleteEnabled = deleteEnabled;
-            _sftp = new SftpClient(host, username, password);
+            _token = _shutdownCts.Token;
+            _pool = new SftpConnectionPool(options.Host, options.Username, options.Password,
+                options.MaxConnections, IdleConnectionTimeout);
 
-            //The first instance is responsible for creating ALL of the the directories.
-            //Subsequent instances will not be created until this one completes.
-
-            DoneMakingFolders = createFolders
-                ? CreateDirectories(_localRootDirectory, _remoteRootDirectory)
-                : Task.CompletedTask;
-
-            //Now perform the initial sync for the pattern this instance is responsible for
-
-            DoneInitialSync = InitialSync(_localRootDirectory, _remoteRootDirectory);
-
-            // Register callbacks immediately; handler will ignore events until initial sync completes.
-            _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
-            if (deleteEnabled && handleDirectoryDeletes)
+            // Register callbacks immediately; events are ignored until the initial sync has completed.
+            foreach (var pattern in _searchPatterns)
             {
-                _director.AddDirectoryDeleteCallback((args) => Fsw_DirectoryDeleted(null, args));
+                _director.AddCallback(pattern, OnFileEvent);
             }
-            if (handleDirectoryDeletes)
+
+            if (_deleteEnabled)
             {
-                _director.AddDirectoryCreateCallback((args) => Fsw_DirectoryCreated(null, args));
-                _director.AddDirectoryRenameCallback((args) => Fsw_DirectoryRenamed(null, args));
+                _director.AddDirectoryDeleteCallback(args => OnDirectoryEvent(DirectoryOperation.Delete, args.FullPath, null));
+            }
+            _director.AddDirectoryCreateCallback(args => OnDirectoryEvent(DirectoryOperation.Create, args.FullPath, null));
+            _director.AddDirectoryRenameCallback(args => OnDirectoryEvent(DirectoryOperation.Rename, args.FullPath, args.OldFullPath));
+        }
+
+        // ------------------------------------------------------------------------------------------------------------
+        // Real-time sync: file system events are queued, then uploaded by whichever pooled connection is free
+        // ------------------------------------------------------------------------------------------------------------
+
+        private enum ChangeKind
+        {
+            Upload,
+            Delete,
+            DirectoryCreate,
+            DirectoryDelete,
+            DirectoryRename
+        }
+
+        private enum DirectoryOperation
+        {
+            Create,
+            Delete,
+            Rename
+        }
+
+        private sealed class PendingChange
+        {
+            public PendingChange(ChangeKind kind, string path, string? oldPath)
+            {
+                Kind = kind;
+                Path = path;
+                OldPath = oldPath;
+            }
+
+            public ChangeKind Kind { get; private set; }
+            public string Path { get; }
+
+            /// <summary>For a rename, the previous local path of the file or directory.</summary>
+            public string? OldPath { get; private set; }
+
+            public bool IsDirectoryOperation => Kind >= ChangeKind.DirectoryCreate;
+
+            /// <summary>Fold a newer event for the same file into this one that has not been started yet.</summary>
+            public void MergeFrom(PendingChange newer)
+            {
+                Kind = newer.Kind;
+                OldPath = newer.OldPath ?? OldPath;
             }
         }
 
-        public RemoteSync(string host, string username, string password,
-            string localRootDirectory, string remoteRootDirectory,
-            string searchPattern, SyncDirector director, List<string>? excludedFolders, Task initialSyncTask, bool deleteEnabled, bool handleDirectoryDeletes)
+        private void OnFileEvent(FileSystemEventArgs arg)
         {
-            _host = host;
-            _username = username;
-            _password = password;
-            _searchPattern = searchPattern;
-            _localRootDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(localRootDirectory));
-            _remoteRootDirectory = remoteRootDirectory.TrimEnd('/', '\\');
-            _director = director;
-            _excludedFolders = excludedFolders ?? new List<string>();
-            _deleteEnabled = deleteEnabled;
-            _sftp = new SftpClient(host, username, password);
-
-            DoneMakingFolders = Task.CompletedTask;
-
-            DoneInitialSync = initialSyncTask;
-
-            // Register callbacks immediately; handler will ignore events until initial sync completes.
-            _director.AddCallback(searchPattern, (args) => Fsw_Changed(null, args));
-            if (deleteEnabled && handleDirectoryDeletes)
-            {
-                _director.AddDirectoryDeleteCallback((args) => Fsw_DirectoryDeleted(null, args));
-            }
-            if (handleDirectoryDeletes)
-            {
-                _director.AddDirectoryCreateCallback((args) => Fsw_DirectoryCreated(null, args));
-                _director.AddDirectoryRenameCallback((args) => Fsw_DirectoryRenamed(null, args));
-            }
-        }
-
-        public static async Task RunSharedInitialSyncAsync(
-            string host, string username, string password,
-            string localRootDirectory, string remoteRootDirectory,
-            string[] searchPatterns, List<string>? excludedFolders, int workerCount)
-        {
-            if (workerCount <= 0 || searchPatterns.Length == 0)
-            {
+            if (!_realtimeActive || _token.IsCancellationRequested)
                 return;
-            }
-
-            localRootDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(localRootDirectory));
-            remoteRootDirectory = NormalizeRemoteRootDirectory(remoteRootDirectory);
 
             try
             {
-                using (var sftp = new SftpClient(host, username, password))
+                if (arg.ChangeType == WatcherChangeTypes.Deleted)
                 {
-                    await ConnectWithRetryAsync(sftp, "directory creation");
-                    await CreateDirectoriesInternal(sftp, localRootDirectory, localRootDirectory, remoteRootDirectory, excludedFolders);
+                    if (_deleteEnabled)
+                    {
+                        Enqueue(arg.FullPath, new PendingChange(ChangeKind.Delete, arg.FullPath, null));
+                    }
+                }
+                else if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
+                    || arg.ChangeType == WatcherChangeTypes.Renamed)
+                {
+                    var oldPath = (arg as RenamedEventArgs)?.OldFullPath;
+                    Enqueue(arg.FullPath, new PendingChange(ChangeKind.Upload, arg.FullPath, oldPath));
                 }
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Create directories failed. Exception: {ex.Message}");
-                throw;
+                Logger.LogError($"Unhandled file event exception: {ex.Message}");
+            }
+        }
+
+        private void OnDirectoryEvent(DirectoryOperation operation, string path, string? oldPath)
+        {
+            if (!_realtimeActive || _token.IsCancellationRequested)
+                return;
+
+            try
+            {
+                if (IsExcludedDirectoryPath(path) || (oldPath != null && IsExcludedDirectoryPath(oldPath)))
+                    return;
+
+                var kind = operation switch
+                {
+                    DirectoryOperation.Create => ChangeKind.DirectoryCreate,
+                    DirectoryOperation.Delete => ChangeKind.DirectoryDelete,
+                    _ => ChangeKind.DirectoryRename
+                };
+
+                // Directory operations are never merged, so each gets its own key
+                var key = $"\0directory:{Interlocked.Increment(ref _directoryOperationSequence)}";
+                Enqueue(key, new PendingChange(kind, path, oldPath));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unhandled directory event exception: {ex.Message}");
+            }
+        }
+
+        private void Enqueue(string key, PendingChange change)
+        {
+            lock (_queueLock)
+            {
+                if (_pending.TryGetValue(key, out var existing))
+                {
+                    existing.MergeFrom(change);
+                    return;
+                }
+
+                _pending[key] = change;
             }
 
-            var workQueue = new ConcurrentQueue<SyncWorkItem>();
+            _queue.Writer.TryWrite(key);
+        }
 
-            foreach (var pair in EnumerateLocalDirectories(localRootDirectory, remoteRootDirectory, excludedFolders))
+        /// <summary>
+        /// Takes changes from the queue in order. Files are uploaded in parallel (up to the connection limit), but a
+        /// directory operation waits for everything started before it and then runs on its own, so a directory is never
+        /// deleted or renamed underneath an upload.
+        /// </summary>
+        private async Task DispatchLoopAsync()
+        {
+            var running = new List<Task>();
+
+            try
             {
-                foreach (var pattern in searchPatterns)
+                while (await _queue.Reader.WaitToReadAsync(_token).ConfigureAwait(false))
                 {
-                    workQueue.Enqueue(new SyncWorkItem(pair.LocalPath, pair.RemotePath, pattern));
+                    while (_queue.Reader.TryRead(out var key))
+                    {
+                        PendingChange? change;
+
+                        lock (_queueLock)
+                        {
+                            if (!_pending.TryGetValue(key, out change))
+                                continue;
+
+                            // Never upload the same file on two connections at once. It is queued again when the first finishes.
+                            if (!change.IsDirectoryOperation && _inFlight.Contains(key))
+                            {
+                                _blocked.Add(key);
+                                continue;
+                            }
+
+                            _pending.Remove(key);
+
+                            if (!change.IsDirectoryOperation)
+                            {
+                                _inFlight.Add(key);
+                            }
+                        }
+
+                        if (change.IsDirectoryOperation)
+                        {
+                            await Task.WhenAll(running).ConfigureAwait(false);
+                            running.Clear();
+
+                            await Task.Run(() => ProcessDirectoryChange(change), _token).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            await _pendingFileTasks.WaitAsync(_token).ConfigureAwait(false);
+
+                            var fileKey = key;
+                            var fileChange = change;
+                            running.Add(Task.Run(() => ProcessFileChangeAsync(fileKey, fileChange)));
+
+                            if (running.Count >= MaxPendingFileTasks * 2)
+                            {
+                                running.RemoveAll(t => t.IsCompleted);
+                            }
+                        }
+                    }
                 }
             }
-
-            var workers = new List<Task>();
-
-            for (int i = 0; i < workerCount; i++)
+            catch (OperationCanceledException)
             {
-                int workerNumber = i + 1;
-                workers.Add(Task.Run(async () =>
+                // Shutting down
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Sync queue stopped unexpectedly. Exception: {ex.Message}");
+            }
+        }
+
+        private async Task ProcessFileChangeAsync(string key, PendingChange change)
+        {
+            try
+            {
+                if (_token.IsCancellationRequested)
+                    return;
+
+                if (change.Kind == ChangeKind.Upload)
                 {
-                    using (var sftp = new SftpClient(host, username, password))
+                    if (Directory.Exists(change.Path))
+                        return;
+
+                    // Wait for whatever is writing the file to finish, without holding on to a connection
+                    var waitStart = DateTime.UtcNow;
+                    while (!IsFileReady(change.Path))
                     {
-                        try
+                        if (!File.Exists(change.Path))
+                            return;
+
+                        if (DateTime.UtcNow - waitStart > TimeSpan.FromSeconds(30))
                         {
-                            await ConnectWithRetryAsync(sftp, $"sync worker {workerNumber}");
-                        }
-                        catch (Exception ex)
-                        {
-                            // Other workers drain the shared queue. If none can connect, this is reported after WhenAll.
-                            Logger.LogWarnig($"Sync worker {workerNumber} could not connect and will not take part in the initial sync. Exception: {ex.Message}");
+                            Logger.LogWarnig($"Timeout waiting for file ready: {change.Path}");
                             return;
                         }
 
-                        while (workQueue.TryDequeue(out var item))
-                        {
-                            await SyncDirectoryWithRetryAsync(sftp, item);
-                        }
+                        await Task.Delay(25, _token).ConfigureAwait(false);
                     }
-                }));
+                }
+
+                using (var lease = await _pool.AcquireAsync(_token).ConfigureAwait(false))
+                {
+                    if (change.Kind == ChangeKind.Upload)
+                    {
+                        SyncChangedFile(lease.Client, change);
+                    }
+                    else
+                    {
+                        SyncFileDelete(lease.Client, change);
+                    }
+                }
             }
-
-            await Task.WhenAll(workers);
-
-            if (!workQueue.IsEmpty)
+            catch (OperationCanceledException)
             {
-                throw new InvalidOperationException("Initial sync could not complete because no sync worker was able to connect.");
+                // Shutting down
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unhandled file sync exception: {ex.Message}");
+            }
+            finally
+            {
+                _pendingFileTasks.Release();
+
+                lock (_queueLock)
+                {
+                    _inFlight.Remove(key);
+
+                    if (_blocked.Remove(key))
+                    {
+                        _queue.Writer.TryWrite(key);
+                    }
+                }
             }
         }
+
+        /// <summary>
+        /// Sync changes for a file. This is only used for changes AFTER the initial sync has completed.
+        /// </summary>
+        private void SyncChangedFile(SftpClient sftp, PendingChange change)
+        {
+            var localPath = change.Path;
+            var remoteFilePath = GetRemotePathForLocal(localPath);
+            var remoteDirectoryPath = GetRemotePathForLocal(Path.GetDirectoryName(localPath) ?? _localRootDirectory);
+
+            Logger.LogInfo($"Syncing {localPath}");
+
+            const int maxRetries = 5;
+            const int delayBetweenRetriesMs = 500;
+
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    if (!File.Exists(localPath))
+                        return;     // Gone again already; a delete event will follow if it matters
+
+                    if (!sftp.IsConnected)
+                    {
+                        sftp.Connect();
+                    }
+
+                    EnsureRemoteDirectory(sftp, remoteDirectoryPath);
+
+                    // Because the VMS SFTP server uses Posix not RMS, and some older servers do not correctly
+                    // handle truncating files when the content gets shorter (resulting in corruption at the end of the file),
+                    // we delete the file first if it exists, before writing new content.
+                    DeleteRemoteFileIfPresent(sftp, remoteFilePath);
+
+                    sftp.WriteAllText(remoteFilePath, File.ReadAllText(localPath));
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // Make sure the directory is checked for again
+                    _knownRemoteDirectories.TryRemove(remoteDirectoryPath, out _);
+
+                    if (attempt >= maxRetries)
+                    {
+                        Logger.LogError($"Sync failed after {maxRetries} retries. Exception: {ex.Message}");
+                        return;
+                    }
+
+                    Logger.LogInfo($"Retry {attempt}/{maxRetries} after exception: {ex.Message}");
+                    Thread.Sleep(delayBetweenRetriesMs);
+                }
+            }
+
+            DeleteRenamedSource(sftp, change, remoteFilePath);
+        }
+
+        /// <summary>
+        /// After a file has been renamed, delete the remote copy under its old name.
+        /// </summary>
+        private void DeleteRenamedSource(SftpClient sftp, PendingChange change, string remoteFilePath)
+        {
+            if (!_deleteEnabled || change.OldPath == null || IsVsTempFile(change.OldPath))
+                return;
+
+            var oldRemoteFilePath = GetRemotePathForLocal(change.OldPath);
+
+            if (string.Equals(oldRemoteFilePath, remoteFilePath, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (sftp.Exists(oldRemoteFilePath))
+            {
+                var attributes = sftp.GetAttributes(oldRemoteFilePath);
+                if (!attributes.IsDirectory)
+                {
+                    sftp.DeleteFile(oldRemoteFilePath);
+                }
+                else
+                {
+                    Logger.LogWarnig($"Rename cleanup skipped (directory): {oldRemoteFilePath}");
+                }
+            }
+            else
+            {
+                Logger.LogWarnig($"Rename cleanup skipped (not found): {oldRemoteFilePath}");
+            }
+        }
+
+        private void SyncFileDelete(SftpClient sftp, PendingChange change)
+        {
+            var remotePath = GetRemotePathForLocal(change.Path);
+
+            if (!sftp.IsConnected)
+            {
+                sftp.Connect();
+            }
+
+            if (sftp.Exists(remotePath))
+            {
+                var attributes = sftp.GetAttributes(remotePath);
+
+                if (!attributes.IsDirectory)
+                {
+                    Logger.LogInfo($"Syncing delete {change.Path}");
+                    sftp.DeleteFile(remotePath);
+                }
+                else
+                {
+                    Logger.LogWarnig($"Syncing delete skipped (directory): {remotePath}");
+                }
+            }
+            else
+            {
+                Logger.LogWarnig($"Syncing delete {remotePath} not found");
+            }
+
+            DeleteRenamedSource(sftp, change, remotePath);
+        }
+
+        /// <summary>
+        /// Make sure a remote directory (and any missing parents below the root) exists.
+        /// </summary>
+        private void EnsureRemoteDirectory(SftpClient sftp, string remotePath)
+        {
+            if (_knownRemoteDirectories.ContainsKey(remotePath))
+                return;
+
+            // Uploads run in parallel, so make sure only one of them creates a directory
+            lock (_directoryCreateLock)
+            {
+                EnsureRemoteDirectoryLocked(sftp, remotePath);
+            }
+        }
+
+        private void EnsureRemoteDirectoryLocked(SftpClient sftp, string remotePath)
+        {
+            if (_knownRemoteDirectories.ContainsKey(remotePath))
+                return;
+
+            // The remote root must already exist (it is checked when the initial sync starts)
+            if (remotePath.Length > _remoteRootDirectory.Length && !sftp.Exists(remotePath))
+            {
+                var separator = remotePath.LastIndexOf('/');
+                if (separator > 0 && separator >= _remoteRootDirectory.Length)
+                {
+                    EnsureRemoteDirectoryLocked(sftp, remotePath.Substring(0, separator));
+                }
+
+                Logger.LogInfo($"Creating directory {remotePath}");
+                sftp.CreateDirectory(remotePath);
+            }
+
+            _knownRemoteDirectories[remotePath] = 0;
+        }
+
+        private void ForgetRemoteDirectories(string remotePath)
+        {
+            foreach (var known in _knownRemoteDirectories.Keys)
+            {
+                if (string.Equals(known, remotePath, StringComparison.OrdinalIgnoreCase)
+                    || known.StartsWith(remotePath + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    _knownRemoteDirectories.TryRemove(known, out _);
+                }
+            }
+        }
+
+        private void ProcessDirectoryChange(PendingChange change)
+        {
+            try
+            {
+                if (_token.IsCancellationRequested)
+                    return;
+
+                using (var lease = _pool.AcquireAsync(_token).GetAwaiter().GetResult())
+                {
+                    var sftp = lease.Client;
+
+                    switch (change.Kind)
+                    {
+                        case ChangeKind.DirectoryCreate:
+                            EnsureRemoteDirectory(sftp, GetRemotePathForLocal(change.Path));
+                            break;
+
+                        case ChangeKind.DirectoryDelete:
+                            DeleteRemoteDirectory(sftp, change);
+                            break;
+
+                        case ChangeKind.DirectoryRename:
+                            RenameRemoteDirectory(sftp, change);
+                            break;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutting down
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unhandled directory sync exception: {ex.Message}");
+            }
+        }
+
+        private void DeleteRemoteDirectory(SftpClient sftp, PendingChange change)
+        {
+            var remotePath = GetRemotePathForLocal(change.Path);
+            ForgetRemoteDirectories(remotePath);
+
+            if (!sftp.Exists(remotePath) && !sftp.Exists(remotePath + ".DIR"))
+            {
+                Logger.LogWarnig($"Deleting directory skipped (not found): {remotePath}");
+            }
+            else
+            {
+                Logger.LogInfo($"Deleting directory {remotePath}");
+                DeleteRemotePathRecursive(sftp, remotePath);
+            }
+        }
+
+        private void RenameRemoteDirectory(SftpClient sftp, PendingChange change)
+        {
+            var oldRemotePath = GetRemotePathForLocal(change.OldPath ?? change.Path);
+            var newRemotePath = GetRemotePathForLocal(change.Path);
+
+            // OpenVMS directory names preserve case but are case-insensitive. A case-only
+            // local rename therefore refers to the same remote directory and needs no action.
+            if (string.Equals(oldRemotePath, newRemotePath, StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.LogInfo($"Ignoring case-only directory rename: {oldRemotePath} -> {newRemotePath}");
+                return;
+            }
+
+            ForgetRemoteDirectories(oldRemotePath);
+
+            if (TryRenameRemoteDirectory(sftp, oldRemotePath, newRemotePath))
+            {
+                Logger.LogInfo($"Renamed directory {oldRemotePath} -> {newRemotePath}");
+                return;
+            }
+
+            Logger.LogWarnig($"Directory rename failed. Attempting fallback: {oldRemotePath} -> {newRemotePath}");
+
+            MoveRemoteDirectoryRecursive(sftp, oldRemotePath, newRemotePath);
+
+            Logger.LogInfo($"Fallback directory rename completed: {oldRemotePath} -> {newRemotePath}");
+        }
+
+        // ------------------------------------------------------------------------------------------------------------
+        // Initial sync
+        // ------------------------------------------------------------------------------------------------------------
 
         private const int MaxAttempts = 3;
         private const int RetryDelayMs = 2000;
@@ -199,8 +602,220 @@ namespace SFTPSyncLib
             }
         }
 
-        private static async Task SyncDirectoryWithRetryAsync(SftpClient sftp, SyncWorkItem item)
+
+        private sealed class SyncChunk
         {
+            public SyncChunk(string remotePath, string[] files)
+            {
+                RemotePath = remotePath;
+                Files = files;
+            }
+
+            public string RemotePath { get; }
+            public string[] Files { get; }
+        }
+
+        private int _initialSyncFilesDone;
+
+        private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// Raised during the initial sync with the number of files uploaded so far and the total to upload. This can be
+        /// raised on any thread.
+        /// </summary>
+        public event Action<int, int>? InitialSyncProgress;
+
+        private async Task ReportProgressAsync(int totalFiles, CancellationToken token)
+        {
+            try
+            {
+                using (var timer = new PeriodicTimer(ProgressInterval))
+                {
+                    while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false))
+                    {
+                        PublishProgress(totalFiles, logIt: true);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // The initial sync has finished
+            }
+        }
+
+        private void PublishProgress(int totalFiles, bool logIt)
+        {
+            int done = Volatile.Read(ref _initialSyncFilesDone);
+
+            if (logIt)
+            {
+                Logger.LogInfo($"Initial sync: {done} of {totalFiles} files uploaded ({(totalFiles == 0 ? 100 : done * 100L / totalFiles)}%)");
+            }
+
+            try
+            {
+                InitialSyncProgress?.Invoke(done, totalFiles);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Progress notification failed. Exception: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Create any missing remote directories, upload every matching file, then switch to real-time syncing.
+        /// </summary>
+        public async Task InitialSyncAsync()
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var remoteRoot = NormalizeRemoteRootDirectory(_options.RemoteRootDirectory);
+
+            try
+            {
+                using (var sftp = new SftpClient(_options.Host, _options.Username, _options.Password))
+                {
+                    await ConnectWithRetryAsync(sftp, "directory creation");
+                    await CreateDirectoriesInternal(sftp, _localRootDirectory, _localRootDirectory, remoteRoot, _excludedFolders);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Create directories failed. Exception: {ex.Message}");
+                throw;
+            }
+
+            _token.ThrowIfCancellationRequested();
+
+            // Look at each directory once, rather than once per pattern, and split large directories into chunks so that
+            // several connections can share them (one directory can hold thousands of files). The biggest chunks go first,
+            // so no connection is left uploading a large one on its own at the end.
+            var directories = EnumerateLocalDirectories(_localRootDirectory, remoteRoot, _excludedFolders).ToList();
+            var chunkSize = Math.Max(1, _options.InitialSyncChunkSize);
+            var chunks = new List<SyncChunk>();
+            int totalFiles = 0;
+
+            foreach (var directory in directories)
+            {
+                _knownRemoteDirectories[directory.RemotePath] = 0;
+
+                var files = new DirectoryInfo(directory.LocalPath)
+                    .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
+                    .Select(file => file.FullName)
+                    .Where(path => MatchesSearchPattern(Path.GetFileName(path)))
+                    .ToArray();
+
+                totalFiles += files.Length;
+
+                for (int start = 0; start < files.Length; start += chunkSize)
+                {
+                    chunks.Add(new SyncChunk(directory.RemotePath, files.Skip(start).Take(chunkSize).ToArray()));
+                }
+            }
+
+            var workQueue = new ConcurrentQueue<SyncChunk>(chunks.OrderByDescending(chunk => chunk.Files.Length));
+            int workerCount = Math.Max(1, Math.Min(_options.InitialSyncWorkers, chunks.Count));
+
+            if (chunks.Count > 0)
+            {
+                Logger.LogInfo($"Initial sync: {totalFiles} files in {directories.Count} directories, using {workerCount} connections");
+
+                PublishProgress(totalFiles, logIt: false);
+
+                using var progressCts = CancellationTokenSource.CreateLinkedTokenSource(_token);
+                var progressReporter = Task.Run(() => ReportProgressAsync(totalFiles, progressCts.Token));
+
+                var workers = new List<Task>();
+
+                for (int i = 0; i < workerCount; i++)
+                {
+                    int workerNumber = i + 1;
+                    workers.Add(Task.Run(async () =>
+                    {
+                        using (var sftp = new SftpClient(_options.Host, _options.Username, _options.Password))
+                        {
+                            try
+                            {
+                                await ConnectWithRetryAsync(sftp, $"sync worker {workerNumber}");
+                            }
+                            catch (Exception ex)
+                            {
+                                // Other workers drain the shared queue. If none can connect, this is reported after WhenAll.
+                                Logger.LogWarnig($"Sync worker {workerNumber} could not connect and will not take part in the initial sync. Exception: {ex.Message}");
+                                return;
+                            }
+
+                            try
+                            {
+                                while (!_token.IsCancellationRequested && workQueue.TryDequeue(out var chunk))
+                                {
+                                    await SyncChunkWithRetryAsync(sftp, chunk);
+                                }
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                // Shutting down
+                            }
+                        }
+                    }));
+                }
+
+                try
+                {
+                    await Task.WhenAll(workers);
+                }
+                finally
+                {
+                    progressCts.Cancel();
+                }
+
+                await progressReporter;
+                PublishProgress(totalFiles, logIt: false);
+
+                _token.ThrowIfCancellationRequested();
+
+                if (!workQueue.IsEmpty)
+                {
+                    throw new InvalidOperationException("Initial sync could not complete because no sync worker was able to connect.");
+                }
+            }
+
+            Logger.LogInfo($"Initial sync finished: {_initialSyncFilesDone} of {totalFiles} files in {stopwatch.Elapsed.TotalSeconds:0.0} seconds");
+
+            // From now on changes are synced as they happen
+            _realtimeActive = true;
+            _ = Task.Run(DispatchLoopAsync);
+
+            // Open the one connection that is kept warm, so the first change is not delayed by connecting
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using (await _pool.AcquireAsync(_token))
+                    {
+                    }
+                }
+                catch (Exception)
+                {
+                    // Reported when a change needs a connection
+                }
+            });
+        }
+
+        private bool MatchesSearchPattern(string fileName)
+        {
+            foreach (var pattern in _searchPatterns)
+            {
+                if (FileSystemName.MatchesSimpleExpression(pattern, fileName, ignoreCase: true))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private async Task SyncChunkWithRetryAsync(SftpClient sftp, SyncChunk chunk)
+        {
+            int index = 0;
+
             for (int attempt = 1; ; attempt++)
             {
                 try
@@ -211,184 +826,98 @@ namespace SFTPSyncLib
                         sftp.Connect();
                     }
 
-                    await SyncDirectoryAsync(sftp, item.LocalPath, item.RemotePath, item.SearchPattern);
+                    // A retry carries on from the file that failed, not from the start of the chunk
+                    for (; index < chunk.Files.Length; index++)
+                    {
+                        _token.ThrowIfCancellationRequested();
+                        UploadInitialFile(sftp, chunk.Files[index], chunk.RemotePath);
+                        Interlocked.Increment(ref _initialSyncFilesDone);
+                    }
+
                     return;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
+                    var failedFile = index < chunk.Files.Length ? chunk.Files[index] : chunk.RemotePath;
+
                     if (attempt >= MaxAttempts)
                     {
-                        Logger.LogError($"Sync failed for {item.LocalPath} ({item.SearchPattern}) after {MaxAttempts} attempts. Exception: {ex.Message}");
+                        Logger.LogError($"Sync failed for {failedFile} after {MaxAttempts} attempts. Exception: {ex.Message}");
                         return;
                     }
 
-                    Logger.LogWarnig($"Sync failed for {item.LocalPath} ({item.SearchPattern}) (attempt {attempt}/{MaxAttempts}), retrying. Exception: {ex.Message}");
-                    await Task.Delay(RetryDelayMs * attempt);
+                    Logger.LogWarnig($"Sync failed for {failedFile} (attempt {attempt}/{MaxAttempts}), retrying. Exception: {ex.Message}");
+                    await Task.Delay(RetryDelayMs * attempt, _token);
                 }
             }
         }
 
         /// <summary>
-        /// Sync changes for a file. This is only used for changes AFTER the initial sync has completed.
+        /// Delete a remote file before it is replaced, if it is there. This tries the delete straight away, rather than
+        /// checking for the file first, which saves a round trip for every file that exists.
+        ///
+        /// Only "file not found" may be ignored. Any other failure must stop the upload: if the old file were left in
+        /// place, the server could write the new content over it without truncating, leaving stale data at the end.
         /// </summary>
-        /// <param name="sftp">SFTP client</param>
-        /// <param name="sourcePath">Path to the source file</param>
-        /// <param name="destinationPath">Path to the destination file</param>
-        public static void SyncFile(SftpClient sftp, string sourcePath, string destinationPath)
+        private static void DeleteRemoteFileIfPresent(SftpClient sftp, string remoteFilePath)
         {
-            Logger.LogInfo($"Syncing {sourcePath}");
-
-            int retryCount = 0;
-            const int maxRetries = 5;
-            const int delayBetweenRetriesMs = 500;
-
-            while (retryCount < maxRetries)
+            try
             {
-                try
-                {
-                    // Because the VMS SFTP server uses Posix not RMS, and some older servers do not correctly
-                    // handle truncating files when the content gets shorter (resulting in corruption at the end of the file),
-                    // we delete the file first if it exists, before writing new content.
-                    if (sftp.Exists(destinationPath))
-                    {
-                        sftp.DeleteFile(destinationPath);
-                    }
-
-                    // Read the local file content
-                    var localFileContent = File.ReadAllText(sourcePath);
-
-                    // Write the remote file
-                    sftp.WriteAllText(destinationPath, localFileContent);
-
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    retryCount++;
-                    if (retryCount >= maxRetries)
-                    {
-                        Logger.LogError($"Sync failed after {maxRetries} retries. Exception: {ex.Message}");
-                        return;
-                    }
-
-                    Logger.LogInfo($"Retry {retryCount}/{maxRetries} after exception: {ex.Message}");
-                    Thread.Sleep(delayBetweenRetriesMs);
-                }
+                sftp.DeleteFile(remoteFilePath);
             }
-        }
-
-        public static Task<IEnumerable<FileInfo>> SyncDirectoryAsync(SftpClient sftp, string sourcePath, string destinationPath, string searchPattern)
-        {
-            if (new DirectoryInfo(sourcePath).EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly).Any())
+            catch (SftpPathNotFoundException)
             {
-                Logger.LogInfo($"Initial sync started for {sourcePath}\\{searchPattern}");
-
-                return Task.Run(() => UploadTopLevelFiles(sftp, sourcePath, destinationPath, searchPattern));
+                // Not there, so there is nothing to delete
             }
-            else
+            catch (SshException)
             {
-                return Task.FromResult(Enumerable.Empty<FileInfo>());
+                // A server that reports a missing file as some other failure: only carry on if the file really is absent
+                if (sftp.Exists(remoteFilePath))
+                    throw;
             }
         }
 
         /// <summary>
-        /// Uploads only the files directly in sourcePath (not subdirectories) to destinationPath.
-        /// SftpClient.SynchronizeDirectories enumerates recursively but uploads by file name only, which flattens
-        /// subdirectory files into every parent remote directory. Callers visit each directory individually, so
-        /// recursion is not needed. Remote files are deleted first, as the VMS server may not truncate correctly.
+        /// Remote files are deleted first, as the VMS server may not truncate correctly.
         /// </summary>
-        private static IEnumerable<FileInfo> UploadTopLevelFiles(SftpClient sftp, string sourcePath, string destinationPath, string searchPattern)
+        private static void UploadInitialFile(SftpClient sftp, string localFile, string remoteDirectory)
         {
-            var uploadedFiles = new List<FileInfo>();
-
-            foreach (var localFile in new DirectoryInfo(sourcePath).EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly))
-            {
-                var remoteFileName = $"{destinationPath}/{localFile.Name}";
-
-                try
-                {
-                    if (sftp.Exists(remoteFileName))
-                    {
-                        sftp.DeleteFile(remoteFileName);
-                    }
-
-                    using (var file = File.OpenRead(localFile.FullName))
-                    {
-                        sftp.UploadFile(file, remoteFileName, canOverride: true);
-                    }
-
-                    uploadedFiles.Add(localFile);
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception($"Failed to upload {localFile.FullName} to {remoteFileName}", ex);
-                }
-            }
-
-            return uploadedFiles;
-        }
-
-        private string[] FilteredDirectories(string localPath)
-        {
-            return FilteredDirectories(_localRootDirectory, localPath, _excludedFolders);
-        }
-
-        public async Task CreateDirectories(string localPath, string remotePath)
-        {
-            Logger.LogInfo($"Creating directory {remotePath}");
+            var remoteFileName = $"{remoteDirectory}/{Path.GetFileName(localFile)}";
 
             try
             {
-                if (!EnsureConnectedSafe())
-                    return;
+                DeleteRemoteFileIfPresent(sftp, remoteFileName);
 
-                await CreateDirectoriesInternal(_sftp, _localRootDirectory, localPath, remotePath, _excludedFolders);
+                using (var file = File.OpenRead(localFile))
+                {
+                    sftp.UploadFile(file, remoteFileName, canOverride: true);
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                Logger.LogError("Failed to create directories. Check the remote target directory exists.");
-
-                Environment.Exit(-1);
+                throw new Exception($"Failed to upload {localFile} to {remoteFileName}", ex);
             }
         }
 
-        /// <summary>
-        /// For the pattern we are responsible for, sync the files in the local directory to the remote directory.
-        /// </summary>
-        /// <param name="localPath">Local directory path</param>
-        /// <param name="remotePath">Remote directory path</param>
-        /// <returns></returns>
-        public async Task InitialSync(string localPath, string remotePath)
+        public void Dispose()
         {
-            //Wait for the folders to be created before starting the initial sync
-            await DoneMakingFolders;
-
-            if (!EnsureConnectedSafe())
-                return;
-
-            //Get the local directories to sync
-            var localDirectories = FilteredDirectories(localPath)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
-            //Get the remote directories to sync, removing the .DIR suffix if it exists
-            var remoteDirectories = (await ListDirectoryAsync(_sftp, remotePath)).Where(item => item.IsDirectory).ToDictionary(item =>
+            lock (_disposeLock)
             {
-                if (item.Name.Contains(".DIR", StringComparison.OrdinalIgnoreCase))
-                    return item.Name.Remove(item.Name.IndexOf(".DIR", StringComparison.OrdinalIgnoreCase));
-                else
-                    return item.Name;
-            });
+                if (_disposed)
+                    return;
 
-            //
-            foreach (var item in localDirectories)
-            {
-                var directoryName = item.Split(Path.DirectorySeparatorChar).Last();
-                var nextRemotePath = AppendRemotePath(remotePath, directoryName);
-                await InitialSync(localPath + "\\" + directoryName, nextRemotePath);
+                _disposed = true;
             }
 
-            await SyncDirectoryAsync(_sftp, localPath, remotePath, _searchPattern);
+            _realtimeActive = false;
+            _shutdownCts.Cancel();
+            _queue.Writer.TryComplete();
+            _pool.Dispose();
+            _shutdownCts.Dispose();
         }
 
         private static string[] FilteredDirectories(string localRootDirectory, string localPath, List<string>? excludedFolders)
@@ -549,415 +1078,6 @@ namespace SFTPSyncLib
                 return normalizedSegment;
 
             return remotePath + "/" + normalizedSegment;
-        }
-
-        private void EnsureConnected()
-        {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(RemoteSync));
-
-            if (_sftp.IsConnected)
-                return;
-
-            _sftp.Connect();
-        }
-
-        private bool EnsureConnectedSafe()
-        {
-            try
-            {
-                EnsureConnected();
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"SFTP connection error: {ex.Message}");
-                return false;
-            }
-        }
-
-        public Task<bool> ConnectAsync()
-        {
-            var task = Task.Run(() => EnsureConnectedSafe());
-            _connectTask = task;
-            return task;
-        }
-
-
-        private async void Fsw_Changed(object? sender, FileSystemEventArgs arg)
-        {
-            try
-            {
-                if (_shutdownCts.IsCancellationRequested)
-                    return;
-
-                if (!DoneInitialSync.IsCompleted)
-                    return;
-
-                if (_deleteEnabled && arg.ChangeType == WatcherChangeTypes.Deleted)
-                {
-                    await SyncFileDeleteAsync(arg);
-                    return;
-                }
-
-                if (arg.ChangeType == WatcherChangeTypes.Changed || arg.ChangeType == WatcherChangeTypes.Created
-                    || arg.ChangeType == WatcherChangeTypes.Renamed)
-                {
-                    var renamedArgs = arg as RenamedEventArgs;
-                    var changedPath = Path.GetDirectoryName(arg.FullPath);
-                    var fullRemotePath = GetRemotePathForLocal(changedPath ?? _localRootDirectory);
-                    var fullRemoteFilePath = GetRemotePathForLocal(arg.FullPath);
-                    var oldRemoteFilePath = renamedArgs != null
-                        ? GetRemotePathForLocal(renamedArgs.OldFullPath)
-                        : null;
-                    await Task.Yield();
-                    bool makeDirectory = true;
-                    lock (_activeDirSync)
-                    {
-                        if (changedPath == null)
-                            return;
-                        if (_activeDirSync.Contains(changedPath))
-                            makeDirectory = false;
-                        else
-                            _activeDirSync.Add(changedPath);
-                    }
-
-                    bool connectionOk;
-                    await _sftpLock.WaitAsync();
-                    try
-                    {
-                        connectionOk = EnsureConnectedSafe();
-                        if (connectionOk)
-                        {
-                            //check if we're a new directory
-                            if (makeDirectory && changedPath != null && Directory.Exists(changedPath) && !_sftp.Exists(fullRemotePath))
-                            {
-                                _sftp.CreateDirectory(fullRemotePath);
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        _sftpLock.Release();
-                    }
-
-                    if (!connectionOk)
-                    {
-                        if (makeDirectory)
-                        {
-                            lock (_activeDirSync)
-                            {
-                                _activeDirSync.Remove(changedPath);
-                            }
-                        }
-                        return;
-                    }
-
-                    if (makeDirectory)
-                    {
-                        lock (_activeDirSync)
-                        {
-                            _activeDirSync.Remove(changedPath);
-                        }
-                    }
-
-                    if (Directory.Exists(arg.FullPath))
-                        return;
-
-                    var waitStart = DateTime.UtcNow;
-                    while (!IsFileReady(arg.FullPath))
-                    {
-                        if (!File.Exists(arg.FullPath))
-                            return;
-                        if (DateTime.UtcNow - waitStart > TimeSpan.FromSeconds(30))
-                        {
-                            Logger.LogWarnig($"Timeout waiting for file ready: {arg.FullPath}");
-                            return;
-                        }
-                        await Task.Delay(25);
-                    }
-
-                    lock (_activeDirSync)
-                    {
-                        if (_activeDirSync.Contains(arg.FullPath))
-                            return;
-                        else
-                            _activeDirSync.Add(arg.FullPath);
-                    }
-
-                    bool fileConnectionOk;
-                    await _sftpLock.WaitAsync();
-                    try
-                    {
-                        fileConnectionOk = EnsureConnectedSafe();
-                        if (fileConnectionOk)
-                        {
-                            SyncFile(_sftp, arg.FullPath, fullRemoteFilePath);
-
-                            if (_deleteEnabled && oldRemoteFilePath != null
-                                && !IsVsTempFile(renamedArgs!.OldFullPath)
-                                && !string.Equals(oldRemoteFilePath, fullRemoteFilePath, StringComparison.OrdinalIgnoreCase))
-                            {
-                                if (_sftp.Exists(oldRemoteFilePath))
-                                {
-                                    var attributes = _sftp.GetAttributes(oldRemoteFilePath);
-                                    if (!attributes.IsDirectory)
-                                    {
-                                        _sftp.DeleteFile(oldRemoteFilePath);
-                                    }
-                                    else
-                                    {
-                                        Logger.LogWarnig($"Rename cleanup skipped (directory): {oldRemoteFilePath}");
-                                    }
-                                }
-                                else
-                                {
-                                    Logger.LogWarnig($"Rename cleanup skipped (not found): {oldRemoteFilePath}");
-                                }
-                            }
-                            else if (_deleteEnabled && renamedArgs != null && oldRemoteFilePath == null)
-                            {
-                                Logger.LogWarnig("Rename cleanup skipped (missing old path).");
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        _sftpLock.Release();
-                        lock (_activeDirSync)
-                        {
-                            _activeDirSync.Remove(arg.FullPath);
-                        }
-                    }
-
-                    if (!fileConnectionOk)
-                        return;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Unhandled file sync handler exception: {ex.Message}");
-            }
-        }
-
-        private async void Fsw_DirectoryDeleted(object? sender, FileSystemEventArgs arg)
-        {
-            try
-            {
-                if (_shutdownCts.IsCancellationRequested)
-                    return;
-
-                if (!DoneInitialSync.IsCompleted)
-                    return;
-
-                if (IsExcludedDirectoryPath(arg.FullPath))
-                    return;
-
-                var remotePath = GetRemotePathForLocal(arg.FullPath);
-                await _sftpLock.WaitAsync();
-                try
-                {
-                    if (EnsureConnectedSafe())
-                    {
-                        if (!_sftp.Exists(remotePath) && !_sftp.Exists(remotePath + ".DIR"))
-                        {
-                            Logger.LogWarnig($"Deleting directory skipped (not found): {remotePath}");
-                        }
-                        else
-                        {
-                            Logger.LogInfo($"Deleting directory {remotePath}");
-                            DeleteRemotePathRecursive(_sftp, remotePath);
-                        }
-                    }
-                }
-                finally
-                {
-                    _sftpLock.Release();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Unhandled directory delete handler exception: {ex.Message}");
-            }
-        }
-
-        private async void Fsw_DirectoryCreated(object? sender, FileSystemEventArgs arg)
-        {
-            try
-            {
-                if (_shutdownCts.IsCancellationRequested)
-                    return;
-
-                if (!DoneInitialSync.IsCompleted)
-                    return;
-
-                if (IsExcludedDirectoryPath(arg.FullPath))
-                    return;
-
-                var remotePath = GetRemotePathForLocal(arg.FullPath);
-                await _sftpLock.WaitAsync();
-                try
-                {
-                    if (EnsureConnectedSafe())
-                    {
-                        if (!_sftp.Exists(remotePath))
-                        {
-                            Logger.LogInfo($"Creating directory {remotePath}");
-                            _sftp.CreateDirectory(remotePath);
-                        }
-                    }
-                }
-                finally
-                {
-                    _sftpLock.Release();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Unhandled directory create handler exception: {ex.Message}");
-            }
-        }
-
-        private async void Fsw_DirectoryRenamed(object? sender, RenamedEventArgs arg)
-        {
-            try
-            {
-                if (_shutdownCts.IsCancellationRequested)
-                    return;
-
-                if (!DoneInitialSync.IsCompleted)
-                    return;
-
-                if (IsExcludedDirectoryPath(arg.OldFullPath) || IsExcludedDirectoryPath(arg.FullPath))
-                    return;
-
-                var oldRemotePath = GetRemotePathForLocal(arg.OldFullPath);
-                var newRemotePath = GetRemotePathForLocal(arg.FullPath);
-
-                // OpenVMS directory names preserve case but are case-insensitive. A case-only
-                // local rename therefore refers to the same remote directory and needs no action.
-                if (string.Equals(oldRemotePath, newRemotePath, StringComparison.OrdinalIgnoreCase))
-                {
-                    Logger.LogInfo($"Ignoring case-only directory rename: {oldRemotePath} -> {newRemotePath}");
-                    return;
-                }
-
-                await _sftpLock.WaitAsync();
-                try
-                {
-                    if (!EnsureConnectedSafe())
-                        return;
-
-                    if (TryRenameRemoteDirectory(_sftp, oldRemotePath, newRemotePath))
-                    {
-                        Logger.LogInfo($"Renamed directory {oldRemotePath} -> {newRemotePath}");
-                        return;
-                    }
-
-                    Logger.LogWarnig($"Directory rename failed. Attempting fallback: {oldRemotePath} -> {newRemotePath}");
-
-                    MoveRemoteDirectoryRecursive(_sftp, oldRemotePath, newRemotePath);
-
-                    Logger.LogInfo($"Fallback directory rename completed: {oldRemotePath} -> {newRemotePath}");
-                }
-                finally
-                {
-                    _sftpLock.Release();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Unhandled directory rename handler exception: {ex.Message}");
-            }
-        }
-
-        private async Task SyncFileDeleteAsync(FileSystemEventArgs arg)
-        {
-            if (_shutdownCts.IsCancellationRequested)
-                return;
-
-            var remotePath = GetRemotePathForLocal(arg.FullPath);
-
-            await _sftpLock.WaitAsync();
-
-            try
-            {
-                if (!EnsureConnectedSafe())
-                    return;
-
-                if (_sftp.Exists(remotePath))
-                {
-                    var attributes = _sftp.GetAttributes(remotePath);
-
-                    if (!attributes.IsDirectory)
-                    {
-                        Logger.LogInfo($"Syncing delete {arg.FullPath}");
-                        _sftp.DeleteFile(remotePath);
-                    }
-                    else
-                    {
-                        Logger.LogWarnig($"Syncing delete skipped (directory): {remotePath}");
-                    }
-                }
-                else
-                {
-                    Logger.LogWarnig($"Syncing delete {remotePath} not found");
-                }
-            }
-            finally
-            {
-                _sftpLock.Release();
-            }
-        }
-
-        public void Dispose()
-        {
-            lock (_disposeLock)
-            {
-                if (_disposed)
-                    return;
-
-                if (!_shutdownCts.IsCancellationRequested)
-                {
-                    _shutdownCts.Cancel();
-                }
-
-                var connectTask = _connectTask;
-                if (connectTask != null && !connectTask.IsCompleted)
-                {
-                    _ = connectTask.ContinueWith(_ => DisposeNow(), TaskScheduler.Default);
-                    return;
-                }
-
-                DisposeNow();
-            }
-        }
-
-        private void DisposeNow()
-        {
-            lock (_disposeLock)
-            {
-                if (_disposed)
-                    return;
-
-                _disposed = true;
-                _shutdownCts.Dispose();
-                _sftp.Dispose();
-            }
-        }
-
-        private sealed class SyncWorkItem
-        {
-            public SyncWorkItem(string localPath, string remotePath, string searchPattern)
-            {
-                LocalPath = localPath;
-                RemotePath = remotePath;
-                SearchPattern = searchPattern;
-            }
-
-            public string LocalPath { get; }
-            public string RemotePath { get; }
-            public string SearchPattern { get; }
         }
 
         private bool IsExcludedDirectoryPath(string localPath)

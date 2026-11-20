@@ -1,4 +1,4 @@
-
+﻿
 using Microsoft.Win32;
 using SFTPSyncLib;
 using System.IO.Pipes;
@@ -200,7 +200,7 @@ namespace SFTPSyncUI
             }
         }
 
-        public static List<RemoteSync> RemoteSyncWorkers = new List<RemoteSync>();
+        private static RemoteSync? activeSync;
         private static SyncDirector? activeDirector;
         private static Task? syncTask;
         private static CancellationTokenSource? syncCts;
@@ -220,7 +220,7 @@ namespace SFTPSyncUI
                 return;
 
             Logger.LogUpdated += loggerAction;
-            Logger.LogInfo("Starting sync workers...");
+            Logger.LogInfo("Starting sync...");
 
             var setStatus = new Action<string>(status =>
             {
@@ -246,12 +246,6 @@ namespace SFTPSyncUI
                     if (token.IsCancellationRequested)
                         return;
 
-                    var director = new SyncDirector(settings.LocalPath, settings.DeleteEnabled);
-                    lock (DirectorLock)
-                    {
-                        activeDirector = director;
-                    }
-
                     var patterns = settings.LocalSearchPattern
                         .Split(';', StringSplitOptions.RemoveEmptyEntries)
                         .Select(pattern => pattern.Trim())
@@ -260,130 +254,74 @@ namespace SFTPSyncUI
 
                     if (patterns.Length == 0)
                     {
-                        if (!token.IsCancellationRequested)
-                        {
-                            Logger.LogError("No valid search patterns were configured.");
-                            setStatus("Invalid search patterns");
-                        }
+                        Logger.LogError("No valid search patterns were configured.");
+                        setStatus("Invalid search patterns");
                         return;
                     }
 
-                    var initialSyncTcs = new TaskCompletionSource<object?>();
-                    var initialSyncTask = initialSyncTcs.Task;
-
-                    // The workers only poll DoneInitialSync.IsCompleted, so a faulted task would otherwise never be
-                    // observed and later surface as an "Unobserved task exception". The failure itself is reported
-                    // where runInitialSyncTask is awaited below.
-                    _ = initialSyncTask.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
-
-                    foreach (var pattern in patterns)
+                    var director = new SyncDirector(settings.LocalPath, settings.DeleteEnabled);
+                    lock (DirectorLock)
                     {
-                        if (token.IsCancellationRequested)
-                            return;
-
-                        try
-                        {
-                            int workerIndex;
-                            RemoteSync worker;
-                            lock (RemoteSyncLock)
-                            {
-                                workerIndex = RemoteSyncWorkers.Count;
-                                worker = new RemoteSync(
-                                    settings.RemoteHost,
-                                    settings.RemoteUsername,
-                                    DPAPIEncryption.Decrypt(settings.RemotePassword),
-                                    settings.LocalPath,
-                                    settings.RemotePath,
-                                    pattern,
-                                    director,
-                                    settings.GetExcludedDirectoryFullPaths(),
-                                    initialSyncTask,
-                                    settings.DeleteEnabled,
-                                    workerIndex == 0);
-                                RemoteSyncWorkers.Add(worker);
-                            }
-
-                            Logger.LogInfo($"Started sync worker {workerIndex + 1} for pattern {pattern}");
-                        }
-                        catch (Exception)
-                        {
-                            if (!token.IsCancellationRequested)
-                                Logger.LogError($"Failed to start sync worker for pattern {pattern}");
-                        }
+                        activeDirector = director;
                     }
 
-                    director.Start();
-
-                    var connectTasks = new List<Task>();
-
-                    RemoteSync[] workerSnapshot;
-                    lock (RemoteSyncLock)
-                    {
-                        workerSnapshot = RemoteSyncWorkers.ToArray();
-                    }
-
-                    if (token.IsCancellationRequested)
-                        return;
-
-                    Logger.LogInfo($"Establishing SFTP connections for {workerSnapshot.Length} workers");
-
-                    for (int i = 0; i < workerSnapshot.Length; i++)
-                    {
-                        connectTasks.Add(workerSnapshot[i].ConnectAsync());
-                    }
-                    await Task.WhenAll(connectTasks);
-
-                    Task runInitialSyncTask;
+                    RemoteSync sync;
 
                     try
                     {
-                        runInitialSyncTask = RemoteSync.RunSharedInitialSyncAsync(
-                            settings.RemoteHost,
-                            settings.RemoteUsername,
-                            DPAPIEncryption.Decrypt(settings.RemotePassword),
-                            settings.LocalPath,
-                            settings.RemotePath,
-                            patterns,
-                            settings.GetExcludedDirectoryFullPaths(),
-                            patterns.Length);
+                        sync = new RemoteSync(
+                            new RemoteSyncOptions
+                            {
+                                Host = settings.RemoteHost,
+                                Username = settings.RemoteUsername,
+                                Password = DPAPIEncryption.Decrypt(settings.RemotePassword),
+                                LocalRootDirectory = settings.LocalPath,
+                                RemoteRootDirectory = settings.RemotePath,
+                                SearchPatterns = patterns,
+                                ExcludedFolders = settings.GetExcludedDirectoryFullPaths(),
+                                DeleteEnabled = settings.DeleteEnabled,
+                                InitialSyncWorkers = Math.Max(1, settings.InitialSyncWorkers),
+                                MaxConnections = Math.Max(1, settings.MaxConnections)
+                            },
+                            director);
                     }
                     catch (Exception ex)
                     {
                         if (!token.IsCancellationRequested)
                         {
-                            Logger.LogError($"Failed to start initial sync. Exception: {ex.Message}");
-                            setStatus("Initial sync failed");
+                            Logger.LogError($"Failed to start sync. Exception: {ex.Message}");
+                            setStatus("Sync failed");
                         }
                         return;
                     }
 
-                    if (token.IsCancellationRequested)
-                        return;
-
-                    await runInitialSyncTask.ContinueWith(t =>
+                    lock (RemoteSyncLock)
                     {
-                        if (token.IsCancellationRequested)
-                            return;
+                        activeSync = sync;
+                    }
 
-                        if (t.IsFaulted && t.Exception != null)
-                        {
-                            initialSyncTcs.TrySetException(t.Exception.InnerExceptions);
-                        }
-                        else if (t.IsCanceled)
-                        {
-                            initialSyncTcs.TrySetCanceled();
-                        }
-                        else
-                        {
-                            initialSyncTcs.TrySetResult(null);
-                        }
-                    }, TaskScheduler.Default);
+                    // StopSync may have run before the sync was registered, in which case nobody else will dispose it
+                    if (token.IsCancellationRequested)
+                    {
+                        sync.Dispose();
+                        return;
+                    }
 
-                    //Wait for all sync workers to finish initial sync then tell the user
+                    sync.InitialSyncProgress += (done, total) =>
+                    {
+                        if (!token.IsCancellationRequested)
+                            setStatus($"Performing initial sync: {done} of {total} files ({(total == 0 ? 100 : done * 100L / total)}%)... DO NOT ALTER SYNCED FILES UNTIL COMPLETE");
+                    };
+
+                    director.Start();
 
                     try
                     {
-                        await runInitialSyncTask;
+                        await sync.InitialSyncAsync();
+                    }
+                    catch (OperationCanceledException) when (token.IsCancellationRequested)
+                    {
+                        return;
                     }
                     catch (Exception ex)
                     {
@@ -437,29 +375,27 @@ namespace SFTPSyncUI
 
             Logger.LogUpdated -= loggerAction;
 
-            RemoteSync[] workerSnapshot;
+            RemoteSync? sync;
             lock (RemoteSyncLock)
             {
-                workerSnapshot = RemoteSyncWorkers.ToArray();
-                RemoteSyncWorkers.Clear();
+                sync = activeSync;
+                activeSync = null;
             }
 
             // Closing an SFTP connection is a blocking network call that can take a long time if the server is slow
-            // to respond, so tear everything down on background threads (in parallel) to keep the UI responsive.
+            // to respond, so tear everything down on a background thread (the connections are closed in parallel)
+            // to keep the UI responsive.
             await Task.Run(() =>
             {
-                Parallel.ForEach(workerSnapshot, remoteSync =>
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                try
                 {
-                    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                    try
-                    {
-                        remoteSync.Dispose();
-                    }
-                    catch { /* Swallow any exceptions */ }
+                    sync?.Dispose();
+                }
+                catch { /* Swallow any exceptions */ }
 
-                    if (stopwatch.Elapsed > TimeSpan.FromSeconds(2))
-                        Logger.LogInfo($"Closing a connection took {stopwatch.Elapsed.TotalSeconds:0.0} seconds");
-                });
+                if (stopwatch.Elapsed > TimeSpan.FromSeconds(2))
+                    Logger.LogInfo($"Closing the connections took {stopwatch.Elapsed.TotalSeconds:0.0} seconds");
 
                 lock (DirectorLock)
                 {

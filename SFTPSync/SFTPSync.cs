@@ -1,5 +1,4 @@
-﻿
-using SFTPSyncLib;
+﻿using SFTPSyncLib;
 
 namespace SFTPSync
 {
@@ -14,23 +13,27 @@ namespace SFTPSync
             else
             {
                 var director = new SyncDirector(args[3]);
-                List<RemoteSync> remoteSyncWorkers = new List<RemoteSync>();
+
+                var remoteSync = new RemoteSync(
+                    new RemoteSyncOptions
+                    {
+                        Host = args[0],
+                        Username = args[1],
+                        Password = args[2],
+                        LocalRootDirectory = args[3],
+                        RemoteRootDirectory = args[4],
+                        SearchPatterns = args[5].Split(';', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(pattern => pattern.Trim())
+                            .Where(pattern => pattern.Length > 0)
+                            .ToArray()
+                    },
+                    director);
+
+                director.Start();
 
                 Logger.LogInfo("Starting initial sync...");
 
-                foreach (var pattern in args[5].Split(';', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (remoteSyncWorkers.Count > 0)
-                    {
-                        await remoteSyncWorkers[0].DoneMakingFolders;
-                    }
-                    remoteSyncWorkers.Add(new RemoteSync(args[0], args[1], args[2], args[3], args[4], pattern, remoteSyncWorkers.Count == 0, director, null, false, remoteSyncWorkers.Count == 0));
-
-                    Logger.LogInfo($"Started sync worker {remoteSyncWorkers.Count} for pattern {pattern}");
-                }
-
-                //Wait for all sync workers to finish initial sync then tell the user
-                await Task.WhenAll(remoteSyncWorkers.Select(rsw => rsw.DoneInitialSync));
+                await remoteSync.InitialSyncAsync();
 
                 Logger.LogInfo("Initial sync complete, real-time sync active");
 
@@ -46,14 +49,11 @@ namespace SFTPSync
                     }
                 }
 
-                foreach (var remoteSync in remoteSyncWorkers)
+                try
                 {
-                    try
-                    {
-                        remoteSync.Dispose();
-                    }
-                    catch { }
+                    remoteSync.Dispose();
                 }
+                catch { }
             }
         }
     }
