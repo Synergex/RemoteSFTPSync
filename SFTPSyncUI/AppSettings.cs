@@ -1,4 +1,5 @@
 ﻿
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -16,6 +17,7 @@ namespace SFTPSyncUI
 
             // Do we have a user settings file?
             bool justCreated = false;
+            bool pathsRepaired = false;
 
             if (!File.Exists(SettingsFile))
             {
@@ -35,6 +37,10 @@ namespace SFTPSyncUI
             try
             {
                 string jsonString = File.ReadAllText(SettingsFile);
+
+                // Fix single backslashes in hand-edited Windows paths before the JSON is parsed
+                jsonString = RepairPathBackslashes(jsonString, out pathsRepaired);
+
                 settings = JsonSerializer.Deserialize<AppSettings>(jsonString);
                 if (settings != null)
                 {
@@ -53,7 +59,7 @@ namespace SFTPSyncUI
             // Verify settings
             if (settings != null)
             {
-                var setingsChanged = false;
+                var setingsChanged = pathsRepaired;
 
                 // Exclusions are stored relative to the local path. Validate them on every load (a user may have
                 // hand-edited the file) and convert full paths from older settings files. This uses the configured
@@ -105,6 +111,136 @@ namespace SFTPSyncUI
             }
 
             return settings ?? null;
+        }
+
+        /// <summary>
+        /// Fix unescaped backslashes in the Windows path values (LocalPath and ExcludedDirectories) of the raw JSON text.
+        /// A path pasted into the file by hand has single backslashes (C:\dev\proj), which JSON requires to be doubled.
+        /// This must run before deserializing: sequences such as \d make the JSON invalid, and others (\t \n \r \b \f)
+        /// are valid escapes that would silently turn into control characters. Those are never valid in a path, so
+        /// they are treated as a backslash followed by a letter.
+        /// </summary>
+        internal static string RepairPathBackslashes(string json, out bool changed)
+        {
+            var sb = new StringBuilder(json.Length + 16);
+            string? currentKey = null;
+            bool inExcludedArray = false;
+            char previous = '\0';   // the previous significant character outside of strings ('"' after a string)
+            int i = 0;
+
+            while (i < json.Length)
+            {
+                char c = json[i];
+
+                if (c == '"')
+                {
+                    bool isValue = previous == ':' || (inExcludedArray && (previous == '[' || previous == ','));
+                    bool isPath = isValue && (inExcludedArray || currentKey == "LocalPath");
+
+                    int start = i;
+                    int j = i + 1;
+
+                    if (isPath)
+                    {
+                        sb.Append('"');
+                        while (j < json.Length)
+                        {
+                            char ch = json[j];
+
+                            if (ch == '"')
+                                break;
+
+                            if (ch != '\\')
+                            {
+                                sb.Append(ch);
+                                j++;
+                                continue;
+                            }
+
+                            char next = j + 1 < json.Length ? json[j + 1] : '\0';
+
+                            if (next == '\\' || next == '/')
+                            {
+                                // Already escaped
+                                sb.Append(ch).Append(next);
+                                j += 2;
+                            }
+                            else if (next == 'u' && j + 5 < json.Length && json.Substring(j + 2, 4).All(Uri.IsHexDigit))
+                            {
+                                // Unicode escape
+                                sb.Append(json, j, 6);
+                                j += 6;
+                            }
+                            else if (next == '"' && IsEndOfValue(json, j + 2))
+                            {
+                                // A path ending in a backslash: the quote closes the string
+                                sb.Append(@"\\");
+                                j++;
+                            }
+                            else if (next == '"')
+                            {
+                                // Genuinely escaped quote; leave it alone
+                                sb.Append(ch).Append(next);
+                                j += 2;
+                            }
+                            else
+                            {
+                                // A lone backslash (including \b \f \n \r \t, which can't be in a path)
+                                sb.Append(@"\\");
+                                j++;
+                            }
+                        }
+
+                        if (j < json.Length)
+                            sb.Append('"');
+                    }
+                    else
+                    {
+                        while (j < json.Length && json[j] != '"')
+                        {
+                            if (json[j] == '\\')
+                                j++;
+                            j++;
+                        }
+
+                        sb.Append(json, start, Math.Min(j + 1, json.Length) - start);
+
+                        // A string that is not a value is a key
+                        if (!isValue)
+                            currentKey = json.Substring(start + 1, Math.Min(j, json.Length) - start - 1);
+                    }
+
+                    i = j + 1;
+                    previous = '"';
+                    continue;
+                }
+
+                sb.Append(c);
+                i++;
+
+                if (char.IsWhiteSpace(c))
+                    continue;
+
+                previous = c;
+
+                if (c == '[' && currentKey == "ExcludedDirectories")
+                    inExcludedArray = true;
+                else if (c == ']')
+                    inExcludedArray = false;
+            }
+
+            var result = sb.ToString();
+            changed = !string.Equals(result, json, StringComparison.Ordinal);
+            return result;
+        }
+
+        // True if only whitespace follows before a ',' ']' '}' or the end of the text
+        private static bool IsEndOfValue(string json, int index)
+        {
+            while (index < json.Length && char.IsWhiteSpace(json[index]))
+                index++;
+
+            return index >= json.Length || json[index] == ',' || json[index] == ']' || json[index] == '}';
         }
 
         // Path.GetInvalidPathChars() only reports '|' and control characters on modern .NET, so list the rest explicitly
