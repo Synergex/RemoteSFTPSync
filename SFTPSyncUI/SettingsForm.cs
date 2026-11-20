@@ -13,6 +13,8 @@ namespace SFTPSyncUI
         private bool initialUiLoad = false;
         private bool _syncRunning = false;
         private bool _invalidRemotePathOnLoad = false;
+        private string _committedLocalPath = String.Empty;
+        private bool _committingLocalPath = false;
 
         private const string InvalidRemotePathMessage =
             "The remote path must be specified in Linux format (for example /dga1303/1tallent/win), " +
@@ -34,6 +36,12 @@ namespace SFTPSyncUI
             textBoxLocalPath.Text = _settings.LocalPath;
             textBoxSearchSpec.Text = _settings.LocalSearchPattern;
             listBox.Items.AddRange(_settings.ExcludedDirectories.ToArray());
+            _committedLocalPath = _settings.LocalPath;
+            UpdateExclusionControls();
+
+            //Check the local path (against the excluded directories) when leaving the field and when closing the form
+            textBoxLocalPath.Validating += (s, e) => CommitLocalPath();
+            FormClosing += (s, e) => CommitLocalPath();
 
             //Remote system settings
             textBoxRemoteHost.Text = _settings.RemoteHost;
@@ -86,30 +94,112 @@ namespace SFTPSyncUI
 
         private void textBoxLocalPath_TextChanged(object sender, EventArgs e)
         {
-            if (!initialUiLoad
-                && (String.IsNullOrWhiteSpace(textBoxLocalPath.Text)
-                || Directory.Exists(textBoxLocalPath.Text)))
+            //The new path is not saved here. It is committed (and checked against the excluded
+            //directories) when the user leaves the field, picks a directory, or closes the form,
+            //so that we don't react to partially typed paths.
+            UpdateExclusionControls();
+        }
+
+        /// <summary>
+        /// Save the local path from the text box, first checking that the excluded directories still exist under it.
+        /// If any do not, the user can either remove those exclusions or reject the new local path (the text box
+        /// is then put back to the previous path).
+        /// </summary>
+        /// <returns>False if the user rejected the new local path, otherwise true</returns>
+        private bool CommitLocalPath()
+        {
+            if (_settings == null || initialUiLoad || _committingLocalPath)
+                return true;
+
+            _committingLocalPath = true;
+            try
             {
-                _settings?.LocalPath = textBoxLocalPath.Text;
+                var newPath = textBoxLocalPath.Text;
+                var blank = String.IsNullOrWhiteSpace(newPath);
+
+                //A path that doesn't exist is not saved (as before), and the Add button stays disabled
+                if (!blank && !Directory.Exists(newPath))
+                    return true;
+
+                if (string.Equals(newPath, _committedLocalPath, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                if (!blank)
+                {
+                    var missing = listBox.Items.Cast<string>()
+                        .Where(relative => !Directory.Exists(Path.Combine(newPath, relative)))
+                        .ToList();
+
+                    if (missing.Count > 0)
+                    {
+                        var shown = string.Join(Environment.NewLine, missing.Take(10).Select(m => "    " + m));
+                        if (missing.Count > 10)
+                            shown += Environment.NewLine + $"    ...and {missing.Count - 10} more";
+
+                        var removeButton = new TaskDialogButton("Remove these exclusions");
+                        var chooseButton = new TaskDialogButton("Choose a different Local Path");
+
+                        var page = new TaskDialogPage
+                        {
+                            Caption = "Excluded Directories",
+                            Heading = "Some excluded directories do not exist under the new Local Path",
+                            Text = $"The new Local Path is:{Environment.NewLine}    {newPath}{Environment.NewLine}{Environment.NewLine}"
+                                 + $"These excluded directories are not subdirectories of it:{Environment.NewLine}{shown}",
+                            Icon = TaskDialogIcon.Warning,
+                            AllowCancel = true,
+                            DefaultButton = chooseButton,
+                            Buttons = { removeButton, chooseButton }
+                        };
+
+                        if (TaskDialog.ShowDialog(this, page) != removeButton)
+                        {
+                            //Reject the new local path
+                            textBoxLocalPath.Text = _committedLocalPath;
+                            return false;
+                        }
+
+                        foreach (var item in missing)
+                            listBox.Items.Remove(item);
+
+                        _settings.ExcludedDirectories = listBox.Items.Cast<string>().ToList();
+                    }
+                }
+
+                _settings.LocalPath = newPath;
+                _committedLocalPath = newPath;
+                return true;
+            }
+            finally
+            {
+                _committingLocalPath = false;
             }
         }
 
         private void buttonLocalPath_Click(object sender, EventArgs e)
         {
-            using var folderDialog = new FolderBrowserDialog
+            //Keep asking until the user picks a local path that is acceptable, or cancels
+            while (true)
             {
-                Description = "Local path",
-                UseDescriptionForTitle = true,
-                ShowNewFolderButton = true,
-                InitialDirectory = !String.IsNullOrWhiteSpace(textBoxLocalPath.Text) && Directory.Exists(textBoxLocalPath.Text)
-                ? textBoxLocalPath.Text
-                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
-            };
+                using var folderDialog = new FolderBrowserDialog
+                {
+                    Description = "Local path",
+                    UseDescriptionForTitle = true,
+                    ShowNewFolderButton = true,
+                    InitialDirectory = !String.IsNullOrWhiteSpace(textBoxLocalPath.Text) && Directory.Exists(textBoxLocalPath.Text)
+                    ? textBoxLocalPath.Text
+                    : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                };
 
-            if (folderDialog.ShowDialog() == DialogResult.OK
-                && !string.IsNullOrWhiteSpace(folderDialog.SelectedPath))
-            {
+                if (folderDialog.ShowDialog() != DialogResult.OK
+                    || string.IsNullOrWhiteSpace(folderDialog.SelectedPath))
+                {
+                    return;
+                }
+
                 textBoxLocalPath.Text = folderDialog.SelectedPath;
+
+                if (CommitLocalPath())
+                    return;
             }
         }
 
@@ -159,37 +249,78 @@ namespace SFTPSyncUI
         /// <param name="e"></param>
         private void btnAdd_Click(object sender, EventArgs e)
         {
-            //Create a directory picker dialog
-            var directoryPicker = new FolderBrowserDialog
+            //Exclusions are stored relative to the local path, so we need a valid, committed one
+            if (!CommitLocalPath())
+                return;
+
+            var localPath = textBoxLocalPath.Text;
+            if (!IsLocalPathValid())
             {
-                Description = "Select a directory to exclude"
+                UpdateExclusionControls();
+                return;
+            }
+
+            //Create a directory picker dialog, starting in the local path
+            using var directoryPicker = new FolderBrowserDialog
+            {
+                Description = "Select a directory to exclude",
+                InitialDirectory = localPath,
+                SelectedPath = localPath
             };
 
             //Show it and check if the user picked a directory
-            if (directoryPicker.ShowDialog() == DialogResult.OK)
+            if (directoryPicker.ShowDialog() != DialogResult.OK)
+                return;
+
+            //The directory must be below the local path. Store it relative to the local path.
+            if (!AppSettings.TryGetRelativeSubdirectory(localPath, directoryPicker.SelectedPath, out var newItem))
             {
-                //Get the selected directory and add it to the list
-                string newItem = directoryPicker.SelectedPath;
-                listBox.Items.Add(newItem);
-
-                //Sort the list items alphabetically
-                var items = listBox.Items.Cast<string>().OrderBy(item => item).ToList();
-                listBox.Items.Clear();
-                foreach (var item in items)
-                {
-                    listBox.Items.Add(item);
-                }
-
-                // Select the newly added item in the list
-                int index = listBox.Items.IndexOf(newItem);
-                if (index >= 0)
-                {
-                    listBox.SelectedIndex = index;
-                }
-
-                //And save the new excluded directories to the settings
-                _settings?.ExcludedDirectories = listBox.Items.Cast<string>().ToList();
+                MessageBox.Show(
+                    $"The excluded directory must be a subdirectory of the Local Path:{Environment.NewLine}{Environment.NewLine}{localPath}",
+                    "Invalid Excluded Directory",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
             }
+
+            //Already excluded?
+            var existing = listBox.Items.Cast<string>()
+                .FirstOrDefault(item => string.Equals(item, newItem, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                listBox.SelectedItem = existing;
+                return;
+            }
+
+            //Add it and sort the list items alphabetically
+            listBox.Items.Add(newItem);
+            var items = listBox.Items.Cast<string>().OrderBy(item => item).ToList();
+            listBox.Items.Clear();
+            foreach (var item in items)
+            {
+                listBox.Items.Add(item);
+            }
+
+            // Select the newly added item in the list
+            int index = listBox.Items.IndexOf(newItem);
+            if (index >= 0)
+            {
+                listBox.SelectedIndex = index;
+            }
+
+            //And save the new excluded directories to the settings
+            _settings?.ExcludedDirectories = listBox.Items.Cast<string>().ToList();
+        }
+
+        private bool IsLocalPathValid() =>
+            !String.IsNullOrWhiteSpace(textBoxLocalPath.Text) && Directory.Exists(textBoxLocalPath.Text);
+
+        /// <summary>
+        /// Directories can only be excluded once a valid local path has been specified
+        /// </summary>
+        private void UpdateExclusionControls()
+        {
+            btnAdd.Enabled = IsLocalPathValid();
         }
 
         /// <summary>

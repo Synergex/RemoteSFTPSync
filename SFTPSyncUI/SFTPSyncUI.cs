@@ -76,6 +76,12 @@ namespace SFTPSyncUI
             {
                 settings = AppSettings.LoadFromFile();
             }
+            catch (InvalidSettingsException ex)
+            {
+                MessageBox.Show(ex.Message, Application.ProductName + " - Invalid Settings", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Application.Exit();
+                return;
+            }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -290,7 +296,7 @@ namespace SFTPSyncUI
                                     settings.RemotePath,
                                     pattern,
                                     director,
-                                    settings.ExcludedDirectories,
+                                    settings.GetExcludedDirectoryFullPaths(),
                                     initialSyncTask,
                                     settings.DeleteEnabled,
                                     workerIndex == 0);
@@ -338,7 +344,7 @@ namespace SFTPSyncUI
                             settings.LocalPath,
                             settings.RemotePath,
                             patterns,
-                            settings.ExcludedDirectories,
+                            settings.GetExcludedDirectoryFullPaths(),
                             patterns.Length);
                     }
                     catch (Exception ex)
@@ -413,7 +419,7 @@ namespace SFTPSyncUI
         /// 
         /// </summary>
         /// <param name="loggerAction"></param>
-        public static async void StopSync(Action<string> loggerAction)
+        public static async Task StopSync(Action<string> loggerAction)
         {
             var setStatus = new Action<string>(status =>
             {
@@ -438,20 +444,29 @@ namespace SFTPSyncUI
                 RemoteSyncWorkers.Clear();
             }
 
-            foreach (var remoteSync in workerSnapshot)
+            // Closing an SFTP connection is a blocking network call that can take a long time if the server is slow
+            // to respond, so tear everything down on background threads (in parallel) to keep the UI responsive.
+            await Task.Run(() =>
             {
-                try
+                Parallel.ForEach(workerSnapshot, remoteSync =>
                 {
-                    remoteSync.Dispose();
-                }
-                catch { /* Swallow any exceptions */ }
-            }
+                    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                    try
+                    {
+                        remoteSync.Dispose();
+                    }
+                    catch { /* Swallow any exceptions */ }
 
-            lock (DirectorLock)
-            {
-                activeDirector?.Dispose();
-                activeDirector = null;
-            }
+                    if (stopwatch.Elapsed > TimeSpan.FromSeconds(2))
+                        Logger.LogInfo($"Closing a connection took {stopwatch.Elapsed.TotalSeconds:0.0} seconds");
+                });
+
+                lock (DirectorLock)
+                {
+                    activeDirector?.Dispose();
+                    activeDirector = null;
+                }
+            });
 
             var task = syncTask;
             if (task != null)

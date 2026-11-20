@@ -60,7 +60,7 @@ namespace SFTPSyncUI
             listBoxMessages.Margin = new Padding(10, 11, 10, 11);
             listBoxMessages.Name = "listBoxMessages";
             listBoxMessages.ScrollAlwaysVisible = true;
-            listBoxMessages.SelectionMode = SelectionMode.MultiSimple;
+            listBoxMessages.SelectionMode = SelectionMode.MultiExtended;
             listBoxMessages.Size = new Size(1184, 705);
             listBoxMessages.TabIndex = 14;
             listBoxMessages.DrawItem += ListBoxMessages_DrawItem;
