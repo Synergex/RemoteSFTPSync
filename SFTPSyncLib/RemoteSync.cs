@@ -18,6 +18,9 @@ namespace SFTPSyncLib
     {
         private static readonly TimeSpan IdleConnectionTimeout = TimeSpan.FromSeconds(60);
 
+        // How long a newly created empty file is given to be written to before it is synced as an empty file
+        private static readonly TimeSpan EmptyFileGracePeriod = TimeSpan.FromSeconds(2);
+
         // Bounds the number of changed files being prepared (waiting for a connection or for the file to be writable)
         private const int MaxPendingFileTasks = 64;
 
@@ -134,9 +137,12 @@ namespace SFTPSyncLib
 
             try
             {
+                // The whole tree is watched, so events arrive for excluded directories too. Files there are never synced.
+                var excluded = IsInExcludedDirectory(arg.FullPath);
+
                 if (arg.ChangeType == WatcherChangeTypes.Deleted)
                 {
-                    if (_deleteEnabled)
+                    if (_deleteEnabled && !excluded)
                     {
                         Enqueue(arg.FullPath, new PendingChange(ChangeKind.Delete, arg.FullPath, null));
                     }
@@ -145,7 +151,21 @@ namespace SFTPSyncLib
                     || arg.ChangeType == WatcherChangeTypes.Renamed)
                 {
                     var oldPath = (arg as RenamedEventArgs)?.OldFullPath;
-                    Enqueue(arg.FullPath, new PendingChange(ChangeKind.Upload, arg.FullPath, oldPath));
+                    var oldExcluded = oldPath != null && IsInExcludedDirectory(oldPath);
+
+                    if (excluded)
+                    {
+                        // Moved into an excluded directory: it is no longer synced, so remove the remote copy
+                        if (oldPath != null && !oldExcluded && _deleteEnabled)
+                        {
+                            Enqueue(oldPath, new PendingChange(ChangeKind.Delete, oldPath, null));
+                        }
+                    }
+                    else
+                    {
+                        // Moved out of an excluded directory: there is no remote copy of the old name to clean up
+                        Enqueue(arg.FullPath, new PendingChange(ChangeKind.Upload, arg.FullPath, oldExcluded ? null : oldPath));
+                    }
                 }
             }
             catch (Exception ex)
@@ -281,10 +301,28 @@ namespace SFTPSyncLib
 
                     // Wait for whatever is writing the file to finish, without holding on to a connection
                     var waitStart = DateTime.UtcNow;
-                    while (!IsFileReady(change.Path))
+                    DateTime? emptySince = null;
+
+                    while (true)
                     {
-                        if (!File.Exists(change.Path))
-                            return;
+                        if (TryGetUnlockedFileLength(change.Path, out var length))
+                        {
+                            if (length > 0)
+                                break;
+
+                            // A new file is often created empty and then written to, so give a writer a moment. If it is
+                            // still empty after that, it really is an empty file and is synced as one.
+                            emptySince ??= DateTime.UtcNow;
+                            if (DateTime.UtcNow - emptySince.Value > EmptyFileGracePeriod)
+                                break;
+                        }
+                        else
+                        {
+                            emptySince = null;
+
+                            if (!File.Exists(change.Path))
+                                return;
+                        }
 
                         if (DateTime.UtcNow - waitStart > TimeSpan.FromSeconds(30))
                         {
@@ -1016,27 +1054,23 @@ namespace SFTPSyncLib
         }
 
 
-        public static bool IsFileReady(String sFilename)
+        /// <summary>
+        /// If the file can be opened for exclusive access it means that the file is no longer locked by another
+        /// process. Returns false if it is locked (or missing), otherwise true with the file's length.
+        /// </summary>
+        public static bool TryGetUnlockedFileLength(string fileName, out long length)
         {
-            // If the file can be opened for exclusive access it means that the file
-            // is no longer locked by another process.
             try
             {
-                using (FileStream inputStream = File.Open(sFilename, FileMode.Open, FileAccess.Read, FileShare.None))
+                using (var inputStream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.None))
                 {
-                    if (inputStream.Length > 0)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-
+                    length = inputStream.Length;
+                    return true;
                 }
             }
             catch (Exception)
             {
+                length = 0;
                 return false;
             }
         }
@@ -1078,6 +1112,27 @@ namespace SFTPSyncLib
                 return normalizedSegment;
 
             return remotePath + "/" + normalizedSegment;
+        }
+
+        /// <summary>
+        /// True if a file is in an excluded directory, or in a subdirectory of one. The directories are checked from the
+        /// local root down, the same way the initial sync decides which directories to visit.
+        /// </summary>
+        private bool IsInExcludedDirectory(string localFilePath)
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(localFilePath));
+
+            while (!string.IsNullOrEmpty(directory)
+                   && directory.Length > _localRootDirectory.Length
+                   && directory.StartsWith(_localRootDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+                if (IsExcludedDirectoryPath(directory))
+                    return true;
+
+                directory = Path.GetDirectoryName(directory);
+            }
+
+            return false;
         }
 
         private bool IsExcludedDirectoryPath(string localPath)
