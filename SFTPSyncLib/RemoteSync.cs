@@ -18,6 +18,9 @@ namespace SFTPSyncLib
     {
         private static readonly TimeSpan IdleConnectionTimeout = TimeSpan.FromSeconds(60);
 
+        // How long a newly created empty file is given to be written to before it is synced as an empty file
+        private static readonly TimeSpan EmptyFileGracePeriod = TimeSpan.FromSeconds(2);
+
         // Bounds the number of changed files being prepared (waiting for a connection or for the file to be writable)
         private const int MaxPendingFileTasks = 64;
 
@@ -298,10 +301,28 @@ namespace SFTPSyncLib
 
                     // Wait for whatever is writing the file to finish, without holding on to a connection
                     var waitStart = DateTime.UtcNow;
-                    while (!IsFileReady(change.Path))
+                    DateTime? emptySince = null;
+
+                    while (true)
                     {
-                        if (!File.Exists(change.Path))
-                            return;
+                        if (TryGetUnlockedFileLength(change.Path, out var length))
+                        {
+                            if (length > 0)
+                                break;
+
+                            // A new file is often created empty and then written to, so give a writer a moment. If it is
+                            // still empty after that, it really is an empty file and is synced as one.
+                            emptySince ??= DateTime.UtcNow;
+                            if (DateTime.UtcNow - emptySince.Value > EmptyFileGracePeriod)
+                                break;
+                        }
+                        else
+                        {
+                            emptySince = null;
+
+                            if (!File.Exists(change.Path))
+                                return;
+                        }
 
                         if (DateTime.UtcNow - waitStart > TimeSpan.FromSeconds(30))
                         {
@@ -1033,27 +1054,23 @@ namespace SFTPSyncLib
         }
 
 
-        public static bool IsFileReady(String sFilename)
+        /// <summary>
+        /// If the file can be opened for exclusive access it means that the file is no longer locked by another
+        /// process. Returns false if it is locked (or missing), otherwise true with the file's length.
+        /// </summary>
+        public static bool TryGetUnlockedFileLength(string fileName, out long length)
         {
-            // If the file can be opened for exclusive access it means that the file
-            // is no longer locked by another process.
             try
             {
-                using (FileStream inputStream = File.Open(sFilename, FileMode.Open, FileAccess.Read, FileShare.None))
+                using (var inputStream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.None))
                 {
-                    if (inputStream.Length > 0)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-
+                    length = inputStream.Length;
+                    return true;
                 }
             }
             catch (Exception)
             {
+                length = 0;
                 return false;
             }
         }
