@@ -225,14 +225,49 @@ namespace SFTPSyncLib
             {
                 Logger.LogInfo($"Initial sync started for {sourcePath}\\{searchPattern}");
 
-                return Task<IEnumerable<FileInfo>>.Factory.FromAsync(sftp.BeginSynchronizeDirectories,
-                                                   sftp.EndSynchronizeDirectories, sourcePath,
-                                                   destinationPath, searchPattern, null);
+                return Task.Run(() => UploadTopLevelFiles(sftp, sourcePath, destinationPath, searchPattern));
             }
             else
             {
                 return Task.FromResult(Enumerable.Empty<FileInfo>());
             }
+        }
+
+        /// <summary>
+        /// Uploads only the files directly in sourcePath (not subdirectories) to destinationPath.
+        /// SftpClient.SynchronizeDirectories enumerates recursively but uploads by file name only, which flattens
+        /// subdirectory files into every parent remote directory. Callers visit each directory individually, so
+        /// recursion is not needed. Remote files are deleted first, as the VMS server may not truncate correctly.
+        /// </summary>
+        private static IEnumerable<FileInfo> UploadTopLevelFiles(SftpClient sftp, string sourcePath, string destinationPath, string searchPattern)
+        {
+            var uploadedFiles = new List<FileInfo>();
+
+            foreach (var localFile in new DirectoryInfo(sourcePath).EnumerateFiles(searchPattern, SearchOption.TopDirectoryOnly))
+            {
+                var remoteFileName = $"{destinationPath}/{localFile.Name}";
+
+                try
+                {
+                    if (sftp.Exists(remoteFileName))
+                    {
+                        sftp.DeleteFile(remoteFileName);
+                    }
+
+                    using (var file = File.OpenRead(localFile.FullName))
+                    {
+                        sftp.UploadFile(file, remoteFileName, canOverride: true);
+                    }
+
+                    uploadedFiles.Add(localFile);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Failed to upload {localFile.FullName} to {remoteFileName}", ex);
+                }
+            }
+
+            return uploadedFiles;
         }
 
         private string[] FilteredDirectories(string localPath)
