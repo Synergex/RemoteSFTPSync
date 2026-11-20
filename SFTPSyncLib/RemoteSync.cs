@@ -1,4 +1,5 @@
 ﻿using Renci.SshNet;
+using Renci.SshNet.Common;
 using Renci.SshNet.Sftp;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -362,10 +363,7 @@ namespace SFTPSyncLib
                     // Because the VMS SFTP server uses Posix not RMS, and some older servers do not correctly
                     // handle truncating files when the content gets shorter (resulting in corruption at the end of the file),
                     // we delete the file first if it exists, before writing new content.
-                    if (sftp.Exists(remoteFilePath))
-                    {
-                        sftp.DeleteFile(remoteFilePath);
-                    }
+                    DeleteRemoteFileIfPresent(sftp, remoteFilePath);
 
                     sftp.WriteAllText(remoteFilePath, File.ReadAllText(localPath));
                     break;
@@ -859,6 +857,31 @@ namespace SFTPSyncLib
         }
 
         /// <summary>
+        /// Delete a remote file before it is replaced, if it is there. This tries the delete straight away, rather than
+        /// checking for the file first, which saves a round trip for every file that exists.
+        ///
+        /// Only "file not found" may be ignored. Any other failure must stop the upload: if the old file were left in
+        /// place, the server could write the new content over it without truncating, leaving stale data at the end.
+        /// </summary>
+        private static void DeleteRemoteFileIfPresent(SftpClient sftp, string remoteFilePath)
+        {
+            try
+            {
+                sftp.DeleteFile(remoteFilePath);
+            }
+            catch (SftpPathNotFoundException)
+            {
+                // Not there, so there is nothing to delete
+            }
+            catch (SshException)
+            {
+                // A server that reports a missing file as some other failure: only carry on if the file really is absent
+                if (sftp.Exists(remoteFilePath))
+                    throw;
+            }
+        }
+
+        /// <summary>
         /// Remote files are deleted first, as the VMS server may not truncate correctly.
         /// </summary>
         private static void UploadInitialFile(SftpClient sftp, string localFile, string remoteDirectory)
@@ -867,10 +890,7 @@ namespace SFTPSyncLib
 
             try
             {
-                if (sftp.Exists(remoteFileName))
-                {
-                    sftp.DeleteFile(remoteFileName);
-                }
+                DeleteRemoteFileIfPresent(sftp, remoteFileName);
 
                 using (var file = File.OpenRead(localFile))
                 {
