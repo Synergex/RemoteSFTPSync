@@ -265,6 +265,11 @@ namespace SFTPSyncUI
                     var initialSyncTcs = new TaskCompletionSource<object?>();
                     var initialSyncTask = initialSyncTcs.Task;
 
+                    // The workers only poll DoneInitialSync.IsCompleted, so a faulted task would otherwise never be
+                    // observed and later surface as an "Unobserved task exception". The failure itself is reported
+                    // where runInitialSyncTask is awaited below.
+                    _ = initialSyncTask.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+
                     foreach (var pattern in patterns)
                     {
                         if (token.IsCancellationRequested)
