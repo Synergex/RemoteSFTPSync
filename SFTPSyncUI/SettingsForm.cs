@@ -34,6 +34,7 @@ namespace SFTPSyncUI
             textBoxLocalPath.Text = _settings.LocalPath;
             textBoxSearchSpec.Text = _settings.LocalSearchPattern;
             listBox.Items.AddRange(_settings.ExcludedDirectories.ToArray());
+            UpdateExclusionControls();
 
             //Remote system settings
             textBoxRemoteHost.Text = _settings.RemoteHost;
@@ -92,6 +93,8 @@ namespace SFTPSyncUI
             {
                 _settings?.LocalPath = textBoxLocalPath.Text;
             }
+
+            UpdateExclusionControls();
         }
 
         private void buttonLocalPath_Click(object sender, EventArgs e)
@@ -159,37 +162,75 @@ namespace SFTPSyncUI
         /// <param name="e"></param>
         private void btnAdd_Click(object sender, EventArgs e)
         {
-            //Create a directory picker dialog
-            var directoryPicker = new FolderBrowserDialog
+            //Exclusions are stored relative to the local path, so we need a valid one
+            var localPath = textBoxLocalPath.Text;
+            if (!IsLocalPathValid())
             {
-                Description = "Select a directory to exclude"
+                UpdateExclusionControls();
+                return;
+            }
+
+            //Create a directory picker dialog, starting in the local path
+            using var directoryPicker = new FolderBrowserDialog
+            {
+                Description = "Select a directory to exclude",
+                InitialDirectory = localPath,
+                SelectedPath = localPath
             };
 
             //Show it and check if the user picked a directory
-            if (directoryPicker.ShowDialog() == DialogResult.OK)
+            if (directoryPicker.ShowDialog() != DialogResult.OK)
+                return;
+
+            //The directory must be below the local path. Store it relative to the local path.
+            if (!AppSettings.TryGetRelativeSubdirectory(localPath, directoryPicker.SelectedPath, out var newItem))
             {
-                //Get the selected directory and add it to the list
-                string newItem = directoryPicker.SelectedPath;
-                listBox.Items.Add(newItem);
-
-                //Sort the list items alphabetically
-                var items = listBox.Items.Cast<string>().OrderBy(item => item).ToList();
-                listBox.Items.Clear();
-                foreach (var item in items)
-                {
-                    listBox.Items.Add(item);
-                }
-
-                // Select the newly added item in the list
-                int index = listBox.Items.IndexOf(newItem);
-                if (index >= 0)
-                {
-                    listBox.SelectedIndex = index;
-                }
-
-                //And save the new excluded directories to the settings
-                _settings?.ExcludedDirectories = listBox.Items.Cast<string>().ToList();
+                MessageBox.Show(
+                    $"The excluded directory must be a subdirectory of the Local Path:{Environment.NewLine}{Environment.NewLine}{localPath}",
+                    "Invalid Excluded Directory",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
             }
+
+            //Already excluded?
+            var existing = listBox.Items.Cast<string>()
+                .FirstOrDefault(item => string.Equals(item, newItem, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                listBox.SelectedItem = existing;
+                return;
+            }
+
+            //Add it and sort the list items alphabetically
+            listBox.Items.Add(newItem);
+            var items = listBox.Items.Cast<string>().OrderBy(item => item).ToList();
+            listBox.Items.Clear();
+            foreach (var item in items)
+            {
+                listBox.Items.Add(item);
+            }
+
+            // Select the newly added item in the list
+            int index = listBox.Items.IndexOf(newItem);
+            if (index >= 0)
+            {
+                listBox.SelectedIndex = index;
+            }
+
+            //And save the new excluded directories to the settings
+            _settings?.ExcludedDirectories = listBox.Items.Cast<string>().ToList();
+        }
+
+        private bool IsLocalPathValid() =>
+            !String.IsNullOrWhiteSpace(textBoxLocalPath.Text) && Directory.Exists(textBoxLocalPath.Text);
+
+        /// <summary>
+        /// Directories can only be excluded once a valid local path has been specified
+        /// </summary>
+        private void UpdateExclusionControls()
+        {
+            btnAdd.Enabled = IsLocalPathValid();
         }
 
         /// <summary>

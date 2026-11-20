@@ -76,6 +76,12 @@ namespace SFTPSyncUI
             {
                 settings = AppSettings.LoadFromFile();
             }
+            catch (InvalidSettingsException ex)
+            {
+                MessageBox.Show(ex.Message, Application.ProductName + " - Invalid Settings", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Application.Exit();
+                return;
+            }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -290,7 +296,7 @@ namespace SFTPSyncUI
                                     settings.RemotePath,
                                     pattern,
                                     director,
-                                    settings.ExcludedDirectories,
+                                    settings.GetExcludedDirectoryFullPaths(),
                                     initialSyncTask,
                                     settings.DeleteEnabled,
                                     workerIndex == 0);
@@ -338,7 +344,7 @@ namespace SFTPSyncUI
                             settings.LocalPath,
                             settings.RemotePath,
                             patterns,
-                            settings.ExcludedDirectories,
+                            settings.GetExcludedDirectoryFullPaths(),
                             patterns.Length);
                     }
                     catch (Exception ex)
