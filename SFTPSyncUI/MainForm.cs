@@ -330,14 +330,24 @@ namespace SFTPSyncUI
             }
         }
 
-        private void stopSync()
+        private async void stopSync()
         {
             if (syncRunning)
             {
-                SFTPSyncUI.StopSync(AppendLog);
+                // Stopping can take a while if the server is slow to close connections. Keep the UI responsive,
+                // and don't allow a new sync to start until the old one has been torn down.
                 syncRunning = false;
-                mnuFileStartSync.Enabled = true;
                 mnuFileStopSync.Enabled = false;
+                mnuFileStartSync.Enabled = false;
+
+                try
+                {
+                    await SFTPSyncUI.StopSync(AppendLog);
+                }
+                finally
+                {
+                    mnuFileStartSync.Enabled = true;
+                }
             }
         }
 
