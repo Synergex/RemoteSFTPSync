@@ -134,9 +134,12 @@ namespace SFTPSyncLib
 
             try
             {
+                // The whole tree is watched, so events arrive for excluded directories too. Files there are never synced.
+                var excluded = IsInExcludedDirectory(arg.FullPath);
+
                 if (arg.ChangeType == WatcherChangeTypes.Deleted)
                 {
-                    if (_deleteEnabled)
+                    if (_deleteEnabled && !excluded)
                     {
                         Enqueue(arg.FullPath, new PendingChange(ChangeKind.Delete, arg.FullPath, null));
                     }
@@ -145,7 +148,21 @@ namespace SFTPSyncLib
                     || arg.ChangeType == WatcherChangeTypes.Renamed)
                 {
                     var oldPath = (arg as RenamedEventArgs)?.OldFullPath;
-                    Enqueue(arg.FullPath, new PendingChange(ChangeKind.Upload, arg.FullPath, oldPath));
+                    var oldExcluded = oldPath != null && IsInExcludedDirectory(oldPath);
+
+                    if (excluded)
+                    {
+                        // Moved into an excluded directory: it is no longer synced, so remove the remote copy
+                        if (oldPath != null && !oldExcluded && _deleteEnabled)
+                        {
+                            Enqueue(oldPath, new PendingChange(ChangeKind.Delete, oldPath, null));
+                        }
+                    }
+                    else
+                    {
+                        // Moved out of an excluded directory: there is no remote copy of the old name to clean up
+                        Enqueue(arg.FullPath, new PendingChange(ChangeKind.Upload, arg.FullPath, oldExcluded ? null : oldPath));
+                    }
                 }
             }
             catch (Exception ex)
@@ -1078,6 +1095,27 @@ namespace SFTPSyncLib
                 return normalizedSegment;
 
             return remotePath + "/" + normalizedSegment;
+        }
+
+        /// <summary>
+        /// True if a file is in an excluded directory, or in a subdirectory of one. The directories are checked from the
+        /// local root down, the same way the initial sync decides which directories to visit.
+        /// </summary>
+        private bool IsInExcludedDirectory(string localFilePath)
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(localFilePath));
+
+            while (!string.IsNullOrEmpty(directory)
+                   && directory.Length > _localRootDirectory.Length
+                   && directory.StartsWith(_localRootDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+                if (IsExcludedDirectoryPath(directory))
+                    return true;
+
+                directory = Path.GetDirectoryName(directory);
+            }
+
+            return false;
         }
 
         private bool IsExcludedDirectoryPath(string localPath)
